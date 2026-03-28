@@ -3,6 +3,9 @@ const withCSS = require("@zeit/next-css");
 
 module.exports = withCSS(
     withSass({
+        sassLoaderOptions: {
+            implementation: require("sass")
+        },
         publicRuntimeConfig: {
             backend_url: process.env.NODE_ENV ? process.env.NODE_ENV : "dev"
         },

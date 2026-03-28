@@ -4,10 +4,10 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "dev": "NODE_ENV=dev nodemon --watch server --watch server.js server.js",
-        "build": "next build",
-        "start": "NODE_ENV=production node server.js",
-        "ci": "NODE_ENV=ci node server.js"
+        "dev": "NODE_ENV=dev NODE_OPTIONS=--openssl-legacy-provider nodemon --watch server --watch server.js server.js",
+        "build": "NODE_OPTIONS=--openssl-legacy-provider next build",
+        "start": "NODE_ENV=production NODE_OPTIONS=--openssl-legacy-provider node server.js",
+        "ci": "NODE_ENV=ci NODE_OPTIONS=--openssl-legacy-provider node server.js"
     },
     "author": "",
     "license": "ISC",
@@ -33,7 +33,7 @@
         "mobile-detect": "^1.4.4",
         "mongoose": "^5.7.7",
         "next": "^9.1.2",
-        "node-sass": "^4.13.0",
+        "sass": "^1.32.0",
         "passport": "^0.4.0",
         "passport-local": "^1.0.0",
         "react": "^16.11.0",
@@ -41,9 +41,13 @@
         "react-redux": "^7.1.1",
         "redux": "^4.0.4",
         "redux-devtools-extension": "^2.13.8",
-        "redux-thunk": "^2.3.0"
+        "redux-thunk": "^2.3.0",
+        "sass-loader": "10.4.1"
     },
     "devDependencies": {
         "nodemon": "^1.19.4"
+    },
+    "overrides": {
+        "sass-loader": "10.4.1"
     }
 }
