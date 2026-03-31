@@ -1,5 +1,6 @@
 {
     "/": "/home",
+    "/characters": "/characters",
     "/register": "/register",
     "/createCharacter": "/createCharacter",
     "/ranking": "/ranking",

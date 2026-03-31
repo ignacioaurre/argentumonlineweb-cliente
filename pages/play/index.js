@@ -1,5 +1,4 @@
 import React from "react";
-import { connect } from "react-redux";
 
 import inits from "../../engine/inits";
 
@@ -7,14 +6,12 @@ import _ from "lodash";
 
 import { fetchUrl, routerPush } from "../../config/utils";
 
-import style from "./style.scss";
+import style from "./style.module.scss";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faComment } from "@fortawesome/free-solid-svg-icons";
 
 class Home extends React.Component {
-    static async getInitialProps({ reduxStore, req }) {}
-
     constructor(props) {
         super(props);
 
@@ -1629,4 +1626,4 @@ class Home extends React.Component {
     }
 }
 
-export default connect()(Home);
+export default Home;

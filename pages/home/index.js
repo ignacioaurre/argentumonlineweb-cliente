@@ -1,59 +1,45 @@
 import React from "react";
-import { connect } from "react-redux";
-
 import CreateLink from "../../components/createLink/index";
 import MainContainer from "../../components/mainContainer/index";
-
 import MobileDetect from "mobile-detect";
+import style from "./style.module.scss";
 
-import style from "./style.scss";
+function Home({ userAgent }) {
+    const md = new MobileDetect(userAgent);
 
-class Home extends React.Component {
-    static async getInitialProps({ reduxStore, req }) {
-        const userAgent = req ? req.headers["user-agent"] : navigator.userAgent;
-
-        return { userAgent };
-    }
-
-    constructor(props) {
-        super(props);
-    }
-
-    render() {
-        const { userAgent } = this.props;
-
-        const md = new MobileDetect(userAgent);
-
-        return (
-            <MainContainer userAgent={userAgent}>
-                <div className={style.gralinfo}>
-                    <div className={style.shadow}>
-                        <h2>¡Bienvenidos a Argentum Online Web!</h2>
-                        {!md.mobile() ? (
-                            <p>
-                                <CreateLink href="/register">
-                                    <a>Regístrate</a>
-                                </CreateLink>{" "}
-                                o <strong>Ingresa</strong> para poder jugar!
-                            </p>
-                        ) : null}
-
+    return (
+        <MainContainer userAgent={userAgent}>
+            <div className={style.gralinfo}>
+                <div className={style.shadow}>
+                    <h2>¡Bienvenidos a Argentum Online Web!</h2>
+                    {!md.mobile() && (
                         <p>
-                            Síguemos en nuestra página de{" "}
-                            <a
-                                href="https://www.facebook.com/ArgentumOnlineWeb"
-                                rel="noreferrer"
-                                target="_blank"
-                            >
-                                Facebook
-                            </a>
-                            !
+                            <CreateLink href="/register">
+                                Regístrate
+                            </CreateLink>{" "}
+                            o <strong>Ingresa</strong> para poder jugar!
                         </p>
-                    </div>
+                    )}
+                    <p>
+                        Síguenos en nuestra página de{" "}
+                        <a
+                            href="https://www.facebook.com/ArgentumOnlineWeb"
+                            rel="noreferrer"
+                            target="_blank"
+                        >
+                            Facebook
+                        </a>
+                        !
+                    </p>
                 </div>
-            </MainContainer>
-        );
-    }
+            </div>
+        </MainContainer>
+    );
 }
 
-export default connect()(Home);
+Home.getInitialProps = async ({ req }) => {
+    const userAgent = req ? req.headers["user-agent"] : navigator.userAgent;
+    return { userAgent };
+};
+
+export default Home;

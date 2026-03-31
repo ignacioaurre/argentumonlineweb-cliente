@@ -1,8 +1,6 @@
-import App, { Container } from "next/app";
-import React from "react";
-import withReduxStore from "../lib/with-redux-store";
-import { Provider } from "react-redux";
+import React, { useEffect } from "react";
 import Head from "../components/Head";
+import useStore from "../store/useStore";
 
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import "../styles/style.scss";
@@ -10,59 +8,47 @@ import "../styles/style.scss";
 import { config as configFA } from "@fortawesome/fontawesome-svg-core";
 configFA.autoAddCss = false;
 
-import { fetchUrl, routerPush } from "../config/utils";
+import { fetchUrl } from "../config/utils";
+function MyApp({ Component, pageProps }) {
+    const setAccount = useStore(state => state.setAccount);
+    const setAccountLoaded = useStore(state => state.setAccountLoaded);
 
-import { setAccount } from "../store";
-
-class MyApp extends App {
-    static async getInitialProps({ Component, ctx }) {
-        let pageProps = {};
-
-        if (Component.getInitialProps) {
-            pageProps = await Component.getInitialProps(ctx);
+    useEffect(() => {
+        if (pageProps.initialAccount) {
+            setAccount(pageProps.initialAccount);
+            return;
         }
 
-        if (ctx.req) {
-            const account = await fetchUrl("/checkuserlogged", {
-                credentials: "include",
-                headers: { cookie: ctx.req.headers.cookie }
+        let ignore = false;
+
+        fetchUrl("/checkuserlogged", {
+            credentials: "include"
+        })
+            .then(result => {
+                if (ignore) return;
+                if (result && !result.err) {
+                    setAccount(result);
+                } else {
+                    setAccountLoaded(true);
+                }
+            })
+            .catch(() => {
+                if (!ignore) {
+                    setAccountLoaded(true);
+                }
             });
 
-            if (ctx.req.url == "/createCharacter" && !account.logged) {
-                ctx.res.writeHead(302, {
-                    Location: "/register"
-                });
-                ctx.res.end();
-                return (ctx.res.finished = true);
-            }
+        return () => {
+            ignore = true;
+        };
+    }, [pageProps.initialAccount, setAccount, setAccountLoaded]);
 
-            return { pageProps, account: account };
-        }
-
-        return { pageProps, account: {} };
-    }
-
-    constructor(props) {
-        super(props);
-
-        const { reduxStore, account } = this.props;
-
-        if (account && !account.err) {
-            reduxStore.dispatch(setAccount(account));
-        }
-    }
-
-    render() {
-        const { Component, pageProps, reduxStore } = this.props;
-        return (
-            <React.Fragment>
-                <Head />
-                <Provider store={reduxStore}>
-                    <Component {...pageProps} />
-                </Provider>
-            </React.Fragment>
-        );
-    }
+    return (
+        <React.Fragment>
+            <Head />
+            <Component {...pageProps} />
+        </React.Fragment>
+    );
 }
 
-export default withReduxStore(MyApp);
+export default MyApp;

@@ -67,6 +67,11 @@ class Connection {
             this.engine.clearRender("foreground");
             this.engine.clearRender("textos");
 
+            if (this.config.varCloseForce) {
+                window.location.href = "/";
+                return;
+            }
+
             if (!this.config.varCloseForce) {
                 this.react.setState({
                     showModalReconnect: true

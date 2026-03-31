@@ -1,8 +1,4 @@
-@import "../../styles/variables.scss";
-
-a {
-    color: #ff9000;
-}
+@use "../../styles/variables.scss" as *;
 
 .contentLeft {
     margin-top: 20px;
@@ -26,6 +22,10 @@ a {
             margin-top: 10px;
             margin-bottom: 10px;
         }
+    }
+
+    a {
+        color: #ff9000;
     }
 }
 

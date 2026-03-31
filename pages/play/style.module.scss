@@ -1,4 +1,4 @@
-@import "../../styles/variables.scss";
+@use "../../styles/variables.scss" as *;
 
 .reporte {
     height: 150px;
@@ -627,16 +627,18 @@
                     user-select: none;
                     width: 539px;
                     height: 100px;
+                    box-sizing: border-box;
                     background: rgba(0, 0, 0, 0.5);
                     color: #fff;
                     text-align: left;
-                    padding: 5px 0px 0px 5px;
-                    overflow-y: hidden;
+                    padding: 5px 5px 14px 5px;
+                    overflow-y: auto;
                     font-size: 12px;
+                    line-height: 16px;
                     word-wrap: break-word;
                     position: absolute;
                     top: 439px;
-                    z-index: 6;
+                    z-index: 8;
                     display: none;
                     font-family: "Doppio One", sans-serif;
 
@@ -653,7 +655,7 @@
                     z-index: 10;
                 }
                 .openConsole {
-                    z-index: 7;
+                    z-index: 9;
                     position: absolute;
                     color: #fff;
                     background: rgba(0, 0, 0, 0.5);

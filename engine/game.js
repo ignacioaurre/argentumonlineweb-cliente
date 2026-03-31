@@ -51,7 +51,7 @@ class Game {
     };
 
     writeConsole = (msg, color, bold, italic) => {
-        const { messagesConsole } = this.react.state;
+        const messagesConsole = [...this.react.state.messagesConsole];
 
         if (!color) {
             color = "white";
@@ -81,16 +81,34 @@ class Game {
             messagesConsole.shift();
         }
 
-        this.react.setState({
-            messagesConsole: messagesConsole
-        });
+        this.react.setState(
+            {
+                messagesConsole: messagesConsole
+            },
+            () => {
+                const consoleElem = this.react.refs.console;
 
-        const consoleElem = this.react.refs.console;
-        const scrollHeight = consoleElem.scrollHeight;
-        const height = consoleElem.clientHeight;
+                if (!consoleElem) {
+                    return;
+                }
 
-        const maxScrollTop = scrollHeight - height;
-        consoleElem.scrollTop = maxScrollTop > 0 ? maxScrollTop : 0;
+                requestAnimationFrame(() => {
+                    const lastMessage = consoleElem.lastElementChild;
+
+                    if (lastMessage) {
+                        lastMessage.scrollIntoView({
+                            block: "end"
+                        });
+                        return;
+                    }
+
+                    const maxScrollTop =
+                        consoleElem.scrollHeight - consoleElem.clientHeight;
+
+                    consoleElem.scrollTop = maxScrollTop > 0 ? maxScrollTop : 0;
+                });
+            }
+        );
     };
 }
 

@@ -1,4 +1,11 @@
 const _ = require("lodash");
+const rateLimit = require("express-rate-limit");
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: true, message: "Demasiados intentos. Intentá de nuevo en 15 minutos." }
+});
 
 module.exports = app => {
     const AccountController = require("./controllers/AccountController");
@@ -17,18 +24,22 @@ module.exports = app => {
     });
 
     //ACCOUNT
-    app.post("/api/login", (req, res, next) =>
+    app.post("/api/login", authLimiter, (req, res, next) =>
         AccountInstance.login(req, res, next)
     );
     app.post("/api/logout", (req, res) => AccountInstance.logout(req, res));
     app.get("/api/checkuserlogged", (req, res) =>
         AccountInstance.verifyLogin(req, res)
     );
-    app.post("/api/register", (req, res, next) =>
+    app.post("/api/register", authLimiter, (req, res, next) =>
         AccountInstance.register(req, res, next)
     );
 
     //CHARACTER
+    app.post("/api/character", (req, res) =>
+        CharacterInstance.createCharacter(req, res)
+    );
+
     app.get("/api/character", (req, res) =>
         CharacterInstance.getCharacter(req, res)
     );

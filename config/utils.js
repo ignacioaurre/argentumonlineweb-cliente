@@ -1,18 +1,44 @@
 import Router from "next/router";
 import urls from "./urls.json";
-import config from "../config";
-import getConfig from "next/config";
 import fetch from "isomorphic-fetch";
 import _ from "lodash";
 
-export async function fetchUrl(url, options = {}) {
-    const env = getConfig().publicRuntimeConfig.backend_url;
+function getApiBaseUrl() {
+    if (typeof window !== "undefined") {
+        return "/api";
+    }
 
-    const response = await fetch(config.api(env) + url, options);
+    if (process.env.INTERNAL_API_URL) {
+        return process.env.INTERNAL_API_URL.replace(/\/$/, "");
+    }
+
+    if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+    }
+
+    const port = process.env.PORT || 3000;
+    return `http://localhost:${port}/api`;
+}
+
+export async function fetchUrl(url, options = {}) {
+    const response = await fetch(getApiBaseUrl() + url, options);
 
     const result = await response.json();
 
     return result;
+}
+
+export async function fetchAccountFromRequest(req) {
+    if (!req) {
+        return {};
+    }
+
+    const result = await fetchUrl("/checkuserlogged", {
+        credentials: "include",
+        headers: { cookie: req.headers.cookie || "" }
+    });
+
+    return result && !result.err ? result : {};
 }
 
 export function routerPush(href, query = "", blank) {

@@ -1,509 +1,285 @@
-import React from "react";
-import { connect } from "react-redux";
-
+import React, { useState, useEffect, useRef } from "react";
 import MainContainer from "../../components/mainContainer/index";
 
 import inits from "../../engine/inits";
 import RenderCharacters from "../../engine/renderCharacters";
 
-import { fetchUrl, routerPush } from "../../config/utils";
-import {
-    clases,
-    razas,
-    generos,
-    nameClases,
-    nameGeneros,
-    nameRazas
-} from "../../config/config";
+import { fetchAccountFromRequest, fetchUrl, routerPush } from "../../config/utils";
+import { clases, razas, nameClases, nameGeneros, nameRazas } from "../../config/config";
 
-import style from "./style.scss";
+import useStore from "../../store/useStore";
+import style from "./style.module.scss";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAngleLeft, faAngleRight } from "@fortawesome/free-solid-svg-icons";
 
-class CreateCharacter extends React.Component {
-    static async getInitialProps({ reduxStore, req, res }) {
-        const userAgent = req ? req.headers["user-agent"] : navigator.userAgent;
+const HEAD_RANGES = {
+    [razas.humano]:   { first: 1,   last: 40  },
+    [razas.elfo]:     { first: 101, last: 122 },
+    [razas.elfoDrow]: { first: 201, last: 221 },
+    [razas.enano]:    { first: 301, last: 319 },
+    [razas.gnomo]:    { first: 401, last: 416 },
+};
 
-        return { userAgent };
-    }
+const RAZA_BODIES = {
+    [razas.humano]:   1,
+    [razas.elfo]:     2,
+    [razas.elfoDrow]: 3,
+    [razas.enano]:    300,
+    [razas.gnomo]:    300,
+};
 
-    constructor(props) {
-        super(props);
+function CreateCharacter({ userAgent }) {
+    const account = useStore(state => state.account);
+    const accountLoaded = useStore(state => state.accountLoaded);
+    const initsLoaded = useStore(state => state.initsLoaded);
+    const setAccount = useStore(state => state.setAccount);
+    const canvasRef = useRef(null);
 
-        this.state = {
-            idClaseSelected: 1,
-            idRazaSelected: 1,
-            idGeneroSelected: 1,
-            idHeadSelected: 1,
-            character: {
-                idBody: 1,
-                idHead: 1,
-                idWeapon: 48,
-                idShield: 0,
-                idHelmet: 0,
-                idGenero: 1
-            },
-            nameClase: nameClases[1],
-            nameRaza: nameRazas[1],
-            nameGenero: nameGeneros[1]
-        };
+    const [charName, setCharName] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
+    const [loading, setLoading] = useState(false);
 
-        this.canvas = {};
-    }
+    const [idClaseSelected, setIdClaseSelected] = useState(1);
+    const [idRazaSelected, setIdRazaSelected] = useState(1);
+    const [idGeneroSelected, setIdGeneroSelected] = useState(1);
+    const [idHeadSelected, setIdHeadSelected] = useState(1);
+    const [character, setCharacter] = useState({
+        idBody: 1, idHead: 1, idWeapon: 48, idShield: 0, idHelmet: 0, idGenero: 1
+    });
+    const [nameClase, setNameClase] = useState(nameClases[1]);
+    const [nameRaza, setNameRaza] = useState(nameRazas[1]);
+    const [nameGenero, setNameGenero] = useState(nameGeneros[1]);
 
-    componentDidMount() {
-        const { initsLoaded } = this.props;
-
-        this.canvas.ctx = this.canvas.getContext("2d");
-
-        if (initsLoaded) this.drawChar();
-    }
-
-    drawChar = () => {
-        const { initsLoaded } = this.props;
-        const { character } = this.state;
-
-        if (initsLoaded && this.canvas.ctx) {
-            const rndChar = new RenderCharacters(
-                inits,
-                this.canvas.ctx,
-                character,
-                24,
-                60
-            );
+    useEffect(() => {
+        if (initsLoaded && canvasRef.current) {
+            const ctx = canvasRef.current.getContext("2d");
+            const rndChar = new RenderCharacters(inits, ctx, character, 24, 60);
             rndChar.drawChar();
         }
-    };
+    }, [character, initsLoaded]);
 
-    prevHead = async () => {
-        let { idRazaSelected, idHeadSelected, character } = this.state;
-
-        const humanoHombreFirstHead = 1,
-            elfoHombreFirstHead = 101,
-            elfoDHombreFirstHead = 201,
-            enanoHombreFirstHead = 301,
-            gnomoHombreFirstHead = 401;
-
-        if (idRazaSelected == razas.humano) {
-            if (idHeadSelected > humanoHombreFirstHead) {
-                idHeadSelected--;
-            }
-        } else if (idRazaSelected == razas.elfo) {
-            if (idHeadSelected > elfoHombreFirstHead) {
-                idHeadSelected--;
-            }
-        } else if (idRazaSelected == razas.elfoDrow) {
-            if (idHeadSelected > elfoDHombreFirstHead) {
-                idHeadSelected--;
-            }
-        } else if (idRazaSelected == razas.enano) {
-            if (idHeadSelected > enanoHombreFirstHead) {
-                idHeadSelected--;
-            }
-        } else if (idRazaSelected == razas.gnomo) {
-            if (idHeadSelected > gnomoHombreFirstHead) {
-                idHeadSelected--;
-            }
+    useEffect(() => {
+        if (account.accountId || !accountLoaded) {
+            return;
         }
 
-        character.idHead = idHeadSelected;
+        let ignore = false;
 
-        await this.setState({
-            character: character,
-            idHeadSelected: idHeadSelected
-        });
+        fetchUrl("/checkuserlogged", {
+            credentials: "include"
+        })
+            .then(result => {
+                if (ignore) return;
 
-        this.drawChar();
-    };
+                if (result && !result.err && result.accountId) {
+                    setAccount(result);
+                    return;
+                }
 
-    nextHead = async () => {
-        let { idRazaSelected, idHeadSelected, character } = this.state;
+                routerPush("/register");
+            })
+            .catch(() => {
+                if (!ignore) {
+                    routerPush("/register");
+                }
+            });
 
-        const humanoHombreLastHead = 40,
-            elfoHombreLastHead = 122,
-            elfoDHombreLastHead = 221,
-            enanoHombreLastHead = 319,
-            gnomoHombreLastHead = 416;
+        return () => {
+            ignore = true;
+        };
+    }, [account.accountId, accountLoaded, setAccount]);
 
-        if (idRazaSelected == razas.humano) {
-            if (idHeadSelected < humanoHombreLastHead) {
-                idHeadSelected++;
-            }
-        } else if (idRazaSelected == razas.elfo) {
-            if (idHeadSelected < elfoHombreLastHead) {
-                idHeadSelected++;
-            }
-        } else if (idRazaSelected == razas.elfoDrow) {
-            if (idHeadSelected < elfoDHombreLastHead) {
-                idHeadSelected++;
-            }
-        } else if (idRazaSelected == razas.enano) {
-            if (idHeadSelected < enanoHombreLastHead) {
-                idHeadSelected++;
-            }
-        } else if (idRazaSelected == razas.gnomo) {
-            if (idHeadSelected < gnomoHombreLastHead) {
-                idHeadSelected++;
-            }
+    const handleCreate = async () => {
+        if (!charName.trim()) {
+            setErrorMessage("Ingresá un nombre para el personaje.");
+            return;
         }
 
-        character.idHead = idHeadSelected;
+        setLoading(true);
+        setErrorMessage("");
 
-        await this.setState({
-            character: character,
-            idHeadSelected: idHeadSelected
+        const result = await fetchUrl("/character", {
+            method: "POST",
+            body: JSON.stringify({
+                name: charName.trim(),
+                idClase: idClaseSelected,
+                idRaza: idRazaSelected,
+                idGenero: idGeneroSelected,
+                idHead: idHeadSelected,
+            }),
+            headers: { "Content-Type": "application/json" },
+            credentials: "include"
         });
 
-        this.drawChar();
+        setLoading(false);
+
+        if (result.error) {
+            setErrorMessage(result.message);
+            return;
+        }
+
+        routerPush("/");
     };
 
-    prevClase = async () => {
-        let { idClaseSelected, character } = this.state;
+    const prevHead = () => {
+        const { first } = HEAD_RANGES[idRazaSelected] || HEAD_RANGES[razas.humano];
+        if (idHeadSelected > first) {
+            const newHead = idHeadSelected - 1;
+            setIdHeadSelected(newHead);
+            setCharacter(prev => ({ ...prev, idHead: newHead }));
+        }
+    };
 
+    const nextHead = () => {
+        const { last } = HEAD_RANGES[idRazaSelected] || HEAD_RANGES[razas.humano];
+        if (idHeadSelected < last) {
+            const newHead = idHeadSelected + 1;
+            setIdHeadSelected(newHead);
+            setCharacter(prev => ({ ...prev, idHead: newHead }));
+        }
+    };
+
+    const prevClase = () => {
         if (idClaseSelected > 1) {
-            idClaseSelected--;
-            if (idClaseSelected == 5) {
-                idClaseSelected--;
-            }
-
-            if (idClaseSelected == clases.cazador) {
-                character.idWeapon = 40;
-            } else {
-                character.idWeapon = 48;
-            }
-
-            await this.setState({
-                character: character,
-                idClaseSelected: idClaseSelected,
-                nameClase: nameClases[idClaseSelected]
-            });
-
-            this.drawChar();
+            let newClase = idClaseSelected - 1;
+            if (newClase === 5) newClase--;
+            setIdClaseSelected(newClase);
+            setNameClase(nameClases[newClase]);
+            setCharacter(prev => ({ ...prev, idWeapon: newClase === clases.cazador ? 40 : 48 }));
         }
     };
 
-    nextClase = async () => {
-        let { idClaseSelected, character } = this.state;
-
+    const nextClase = () => {
         if (idClaseSelected < 9) {
-            idClaseSelected++;
-            if (idClaseSelected == 5) {
-                idClaseSelected++;
-            }
-
-            if (idClaseSelected == clases.cazador) {
-                character.idWeapon = 40;
-            } else {
-                character.idWeapon = 48;
-            }
-
-            await this.setState({
-                character: character,
-                idClaseSelected: idClaseSelected,
-                nameClase: nameClases[idClaseSelected]
-            });
-
-            this.drawChar();
+            let newClase = idClaseSelected + 1;
+            if (newClase === 5) newClase++;
+            setIdClaseSelected(newClase);
+            setNameClase(nameClases[newClase]);
+            setCharacter(prev => ({ ...prev, idWeapon: newClase === clases.cazador ? 40 : 48 }));
         }
     };
 
-    prevRaza = async () => {
-        let { idRazaSelected, idHeadSelected, character } = this.state;
-
-        const humanoHombreFirstHead = 1,
-            elfoHombreFirstHead = 101,
-            elfoDHombreFirstHead = 201,
-            enanoHombreFirstHead = 301,
-            gnomoHombreFirstHead = 401;
-
+    const prevRaza = () => {
         if (idRazaSelected > 1) {
-            idRazaSelected--;
-
-            if (idRazaSelected == razas.humano) {
-                character.idBody = 1;
-            } else if (idRazaSelected == razas.elfo) {
-                character.idBody = 2;
-            } else if (idRazaSelected == razas.elfoDrow) {
-                character.idBody = 3;
-            } else if (idRazaSelected == razas.enano) {
-                character.idBody = 300;
-            } else if (idRazaSelected == razas.gnomo) {
-                character.idBody = 300;
-            }
-
-            if (idRazaSelected == razas.humano) {
-                idHeadSelected = humanoHombreFirstHead;
-            } else if (idRazaSelected == razas.elfo) {
-                idHeadSelected = elfoHombreFirstHead;
-            } else if (idRazaSelected == razas.elfoDrow) {
-                idHeadSelected = elfoDHombreFirstHead;
-            } else if (idRazaSelected == razas.enano) {
-                idHeadSelected = enanoHombreFirstHead;
-            } else if (idRazaSelected == razas.gnomo) {
-                idHeadSelected = gnomoHombreFirstHead;
-            }
-
-            character.idHead = idHeadSelected;
-
-            await this.setState({
-                character: character,
-                idHeadSelected: idHeadSelected,
-                nameRaza: nameRazas[idRazaSelected],
-                idRazaSelected: idRazaSelected
-            });
-
-            this.drawChar();
+            const newRaza = idRazaSelected - 1;
+            const { first } = HEAD_RANGES[newRaza] || HEAD_RANGES[razas.humano];
+            setIdRazaSelected(newRaza);
+            setIdHeadSelected(first);
+            setNameRaza(nameRazas[newRaza]);
+            setCharacter(prev => ({ ...prev, idBody: RAZA_BODIES[newRaza], idHead: first }));
         }
     };
 
-    nextRaza = async () => {
-        let { idRazaSelected, idHeadSelected, character } = this.state;
-
-        const humanoHombreFirstHead = 1,
-            elfoHombreFirstHead = 101,
-            elfoDHombreFirstHead = 201,
-            enanoHombreFirstHead = 301,
-            gnomoHombreFirstHead = 401;
-
+    const nextRaza = () => {
         if (idRazaSelected < 5) {
-            idRazaSelected++;
-
-            if (idRazaSelected == razas.humano) {
-                character.idBody = 1;
-            } else if (idRazaSelected == razas.elfo) {
-                character.idBody = 2;
-            } else if (idRazaSelected == razas.elfoDrow) {
-                character.idBody = 3;
-            } else if (idRazaSelected == razas.enano) {
-                character.idBody = 300;
-            } else if (idRazaSelected == razas.gnomo) {
-                character.idBody = 300;
-            }
-
-            if (idRazaSelected == razas.humano) {
-                idHeadSelected = humanoHombreFirstHead;
-            } else if (idRazaSelected == razas.elfo) {
-                idHeadSelected = elfoHombreFirstHead;
-            } else if (idRazaSelected == razas.elfoDrow) {
-                idHeadSelected = elfoDHombreFirstHead;
-            } else if (idRazaSelected == razas.enano) {
-                idHeadSelected = enanoHombreFirstHead;
-            } else if (idRazaSelected == razas.gnomo) {
-                idHeadSelected = gnomoHombreFirstHead;
-            }
-
-            character.idHead = idHeadSelected;
-
-            await this.setState({
-                character: character,
-                idHeadSelected: idHeadSelected,
-                nameRaza: nameRazas[idRazaSelected],
-                idRazaSelected: idRazaSelected
-            });
-
-            this.drawChar();
+            const newRaza = idRazaSelected + 1;
+            const { first } = HEAD_RANGES[newRaza] || HEAD_RANGES[razas.humano];
+            setIdRazaSelected(newRaza);
+            setIdHeadSelected(first);
+            setNameRaza(nameRazas[newRaza]);
+            setCharacter(prev => ({ ...prev, idBody: RAZA_BODIES[newRaza], idHead: first }));
         }
     };
 
-    prevGenero = async () => {
-        let { idGeneroSelected, character } = this.state;
-
+    const prevGenero = () => {
         if (idGeneroSelected > 1) {
-            idGeneroSelected--;
-
-            character.idGenero = idGeneroSelected;
-
-            await this.setState({
-                character: character,
-                idGeneroSelected: idGeneroSelected,
-                nameGenero: nameGeneros[idGeneroSelected]
-            });
-
-            this.drawChar();
+            const newGenero = idGeneroSelected - 1;
+            setIdGeneroSelected(newGenero);
+            setNameGenero(nameGeneros[newGenero]);
+            setCharacter(prev => ({ ...prev, idGenero: newGenero }));
         }
     };
 
-    nextGenero = async () => {
-        let { idGeneroSelected, character } = this.state;
-
+    const nextGenero = () => {
         if (idGeneroSelected < 2) {
-            idGeneroSelected++;
-
-            character.idGenero = idGeneroSelected;
-
-            await this.setState({
-                character: character,
-                idGeneroSelected: idGeneroSelected,
-                nameGenero: nameGeneros[idGeneroSelected]
-            });
-
-            this.drawChar();
+            const newGenero = idGeneroSelected + 1;
+            setIdGeneroSelected(newGenero);
+            setNameGenero(nameGeneros[newGenero]);
+            setCharacter(prev => ({ ...prev, idGenero: newGenero }));
         }
     };
 
-    render() {
-        const { initsLoaded, userAgent } = this.props;
-        const { nameClase, nameRaza, nameGenero } = this.state;
-
-        if (typeof window !== "undefined" && initsLoaded) this.drawChar();
-
-        return (
-            <MainContainer userAgent={userAgent}>
-                <div className={style.contentLeft}>
-                    <div className={style.shadow}>
-                        <h4>Crear Personaje</h4>
-
-                        <div className={style.createCharacter}>
-                            <div className={style.content_general}>
-                                <div className={style.content_left}>
-                                    <label
-                                        htmlFor="name"
-                                        className={style.text}
-                                    >
-                                        Nombre
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={style.input_text}
-                                        id="name"
-                                    />
-                                    <div className={style.canvasCharacter}>
-                                        <FontAwesomeIcon
-                                            icon={faAngleLeft}
-                                            className={style.faAngleLeft}
-                                            onClick={this.prevHead}
-                                        />
-                                        <canvas
-                                            ref={ref => {
-                                                this.canvas = ref;
-                                            }}
-                                            className={style.character}
-                                            width="80"
-                                            height="100"
-                                        />
-                                        <FontAwesomeIcon
-                                            icon={faAngleRight}
-                                            className={style.faAngleRight}
-                                            onClick={this.nextHead}
-                                        />
-                                    </div>
-                                </div>
-                                <div className={style.content_right}>
-                                    <label
-                                        htmlFor="name"
-                                        className={style.text}
-                                    >
-                                        Clase
-                                    </label>
-
-                                    <div className={style.content_input_text}>
-                                        <FontAwesomeIcon
-                                            icon={faAngleLeft}
-                                            className={style.faAngleLeft}
-                                            onClick={this.prevClase}
-                                        />
-                                        <input
-                                            type="text"
-                                            className={style.input_text}
-                                            id="clase"
-                                            disabled=""
-                                            defaultValue={nameClase}
-                                        />
-                                        <FontAwesomeIcon
-                                            icon={faAngleRight}
-                                            className={style.faAngleRight}
-                                            onClick={this.nextClase}
-                                        />
-                                    </div>
-
-                                    <label
-                                        htmlFor="name"
-                                        className={style.text}
-                                    >
-                                        Raza
-                                    </label>
-
-                                    <div className={style.content_input_text}>
-                                        <FontAwesomeIcon
-                                            icon={faAngleLeft}
-                                            className={style.faAngleLeft}
-                                            onClick={this.prevRaza}
-                                        />
-                                        <input
-                                            type="text"
-                                            className={style.input_text}
-                                            id="raza"
-                                            defaultValue={nameRaza}
-                                            disabled=""
-                                        />
-                                        <FontAwesomeIcon
-                                            icon={faAngleRight}
-                                            className={style.faAngleRight}
-                                            onClick={this.nextRaza}
-                                        />
-                                    </div>
-
-                                    <label
-                                        htmlFor="name"
-                                        className={style.text}
-                                    >
-                                        Género
-                                    </label>
-
-                                    <div className={style.content_input_text}>
-                                        <FontAwesomeIcon
-                                            icon={faAngleLeft}
-                                            className={style.faAngleLeft}
-                                            onClick={this.prevGenero}
-                                        />
-                                        <input
-                                            type="text"
-                                            className={style.input_text}
-                                            id="genero"
-                                            defaultValue={nameGenero}
-                                            disabled=""
-                                        />
-                                        <FontAwesomeIcon
-                                            icon={faAngleRight}
-                                            className={style.faAngleRight}
-                                            onClick={this.nextGenero}
-                                        />
-                                    </div>
-
-                                    <label
-                                        htmlFor="name"
-                                        className={style.text}
-                                    >
-                                        Ciudad
-                                    </label>
-
-                                    <div
-                                        className={`${style.content_input_text} ${style.margin_left}`}
-                                    >
-                                        <input
-                                            type="text"
-                                            className={style.input_text}
-                                            id="ciudad"
-                                            defaultValue="Ullathorpe"
-                                            disabled=""
-                                        />
-                                    </div>
+    return (
+        <MainContainer userAgent={userAgent}>
+            <div className={style.contentLeft}>
+                <div className={style.shadow}>
+                    <h4>Crear Personaje</h4>
+                    <div className={style.createCharacter}>
+                        <div className={style.content_general}>
+                            <div className={style.content_left}>
+                                <label htmlFor="charName" className={style.text}>Nombre</label>
+                                <input
+                                    type="text"
+                                    className={style.input_text}
+                                    id="charName"
+                                    value={charName}
+                                    onChange={e => setCharName(e.target.value)}
+                                    maxLength={20}
+                                    placeholder="Nombre del personaje"
+                                />
+                                <div className={style.canvasCharacter}>
+                                    <FontAwesomeIcon icon={faAngleLeft} className={style.faAngleLeft} onClick={prevHead} />
+                                    <canvas ref={canvasRef} className={style.character} width="80" height="100" />
+                                    <FontAwesomeIcon icon={faAngleRight} className={style.faAngleRight} onClick={nextHead} />
                                 </div>
                             </div>
+                            <div className={style.content_right}>
+                                <label htmlFor="clase" className={style.text}>Clase</label>
+                                <div className={style.content_input_text}>
+                                    <FontAwesomeIcon icon={faAngleLeft} className={style.faAngleLeft} onClick={prevClase} />
+                                    <input type="text" className={style.input_text} id="clase" disabled readOnly value={nameClase} />
+                                    <FontAwesomeIcon icon={faAngleRight} className={style.faAngleRight} onClick={nextClase} />
+                                </div>
 
-                            <button>Crear personaje</button>
+                                <label htmlFor="raza" className={style.text}>Raza</label>
+                                <div className={style.content_input_text}>
+                                    <FontAwesomeIcon icon={faAngleLeft} className={style.faAngleLeft} onClick={prevRaza} />
+                                    <input type="text" className={style.input_text} id="raza" disabled readOnly value={nameRaza} />
+                                    <FontAwesomeIcon icon={faAngleRight} className={style.faAngleRight} onClick={nextRaza} />
+                                </div>
+
+                                <label htmlFor="genero" className={style.text}>Género</label>
+                                <div className={style.content_input_text}>
+                                    <FontAwesomeIcon icon={faAngleLeft} className={style.faAngleLeft} onClick={prevGenero} />
+                                    <input type="text" className={style.input_text} id="genero" disabled readOnly value={nameGenero} />
+                                    <FontAwesomeIcon icon={faAngleRight} className={style.faAngleRight} onClick={nextGenero} />
+                                </div>
+
+                                <label htmlFor="ciudad" className={style.text}>Ciudad</label>
+                                <div className={`${style.content_input_text} ${style.margin_left}`}>
+                                    <input type="text" className={style.input_text} id="ciudad" disabled readOnly value="Ullathorpe" />
+                                </div>
+                            </div>
                         </div>
+
+                        {errorMessage && (
+                            <p style={{ color: "#ff4444", fontSize: "13px", margin: "8px 0" }}>
+                                {errorMessage}
+                            </p>
+                        )}
+
+                        <button onClick={handleCreate} disabled={loading}>
+                            {loading ? "Creando..." : "Crear personaje"}
+                        </button>
                     </div>
                 </div>
-            </MainContainer>
-        );
+            </div>
+        </MainContainer>
+    );
+}
+
+CreateCharacter.getInitialProps = async ({ req, res }) => {
+    const account = await fetchAccountFromRequest(req);
+
+    if (account && !account.accountId && req) {
+        res.writeHead(302, { Location: "/register" });
+        res.end();
+        return res.finished = true;
     }
-}
 
-function mapStateToProps(state) {
-    const { initsLoaded, account } = state;
-    return { initsLoaded, account };
-}
+    const userAgent = req ? req.headers["user-agent"] : navigator.userAgent;
+    return { userAgent, initialAccount: account };
+};
 
-export default connect(mapStateToProps)(CreateCharacter);
+export default CreateCharacter;

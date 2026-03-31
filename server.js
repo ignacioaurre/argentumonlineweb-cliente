@@ -1,5 +1,14 @@
+require("dotenv").config();
 const express = require("express");
 const next = require("next");
+const pino = require("pino");
+
+const logger = pino({
+    level: process.env.LOG_LEVEL || "info",
+    transport: process.env.NODE_ENV !== "production"
+        ? { target: "pino-pretty", options: { colorize: true } }
+        : undefined
+});
 
 const port = parseInt(process.env.PORT, 10) || 3000;
 const dev = process.env.NODE_ENV !== "production";
@@ -18,13 +27,15 @@ const passport = require("passport"),
     bodyParser = require("body-parser"),
     routes = require("./server/routes");
 
-if (dev) {
-    const urlMongo = "mongodb://localhost:27017/aoweb";
-    mongoose.connect(urlMongo, { useNewUrlParser: true });
-} else {
-    const urlMongo = "";
-    mongoose.connect(urlMongo, { useNewUrlParser: true });
-}
+const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/aoweb";
+mongoose
+    .connect(mongoUri)
+    .then(() => logger.info("MongoDB conectado"))
+    .catch(err => logger.error({ err }, "Error conectando a MongoDB"));
+
+const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",")
+    : ["http://localhost:3000"];
 
 const robotsOptions = {
     root: __dirname + "/static/",
@@ -41,7 +52,10 @@ app.prepare().then(() => {
     server.use(
         require("cors")({
             origin: function(origin, callback) {
-                callback(null, origin);
+                if (!origin || allowedOrigins.includes(origin)) {
+                    return callback(null, true);
+                }
+                callback(new Error("CORS no permitido para este origen"));
             },
             credentials: true
         })
@@ -56,8 +70,8 @@ app.prepare().then(() => {
     server.use(
         cookieSession({
             name: "session",
-            keys: [""],
-            domain: !dev ? "argentumonlineweb.com" : "",
+            keys: [process.env.SESSION_SECRET || "dev-secret-cambiar-en-produccion"],
+            domain: !dev ? process.env.COOKIE_DOMAIN : undefined,
             maxAge: 24 * 60 * 60 * 1000 * 7
         })
     );
@@ -85,6 +99,8 @@ app.prepare().then(() => {
 
     server.listen(port, err => {
         if (err) throw err;
-        console.log(`> Ready on http://localhost:${port}`);
+        logger.info(`Servidor listo en http://localhost:${port}`);
     });
 });
+
+module.exports = { logger };
