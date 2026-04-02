@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    transpilePackages: ["pixi.js", "@pixi/core", "@pixi/display", "@pixi/ticker", "@pixi/utils"],
     sassOptions: {
         includePaths: ["./styles"]
     },

@@ -1,3 +1,5 @@
+import { setTexture } from "./pixi/textureCache";
+
 class Inits {
     constructor(engine) {
         this.preCacheGraphics = {};
@@ -103,6 +105,7 @@ class Inits {
 
             image.onload = () => {
                 inits.preCacheGraphics[numFile] = image;
+                setTexture(numFile, image);
 
                 resolve(true);
             };

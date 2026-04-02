@@ -1,839 +1,485 @@
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 import inits from "../../engine/inits";
 
 import _ from "lodash";
 
-import { fetchUrl, routerPush } from "../../config/utils";
+import { routerPush } from "../../config/utils";
 
 import style from "./style.module.scss";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faComment } from "@fortawesome/free-solid-svg-icons";
 
-class Home extends React.Component {
-    constructor(props) {
-        super(props);
+// ─── Module-level constants ────────────────────────────────────────────────────
 
-        this.nameKeyCode = {
-            flechaArriba: 0,
-            flechaAbajo: 1,
-            flechaIzquierda: 2,
-            flechaDerecha: 3,
-            usar: 4,
-            atacar: 5,
-            agarrar: 6,
-            tirar: 7,
-            equipar: 8,
-            domar: 9,
-            robar: 10,
-            seguro: 11
-        };
+const NAME_KEY_CODE = {
+    flechaArriba: 0,
+    flechaAbajo: 1,
+    flechaIzquierda: 2,
+    flechaDerecha: 3,
+    usar: 4,
+    atacar: 5,
+    agarrar: 6,
+    tirar: 7,
+    equipar: 8,
+    domar: 9,
+    robar: 10,
+    seguro: 11
+};
 
-        this.state = {
-            showModalControlPanel: false,
-            showInventary: true,
-            showMacroConfig: false,
-            loading: true,
-            user: {},
-            selectItem: 0,
-            showConsole: true,
-            messagesConsole: [],
-            crosshair: false,
-            nameMap: "",
-            showModalReconnect: false,
-            showInputText: false,
-            textDialog: "",
-            showModalTrade: false,
-            trade: {
-                idPosTrade: 0,
-                idPosInv: 0,
-                titleItem: "",
-                infoItem: "",
-                imgItem: "",
-                goldItem: "",
-                itemsTrade: {},
-                itemsUser: {}
-            },
-            cantTrade: 1,
-            mapasToLoad: 0,
-            mapasCargados: 0,
-            keyMacro: {
-                indexMacro: "",
-                idPosItem: "",
-                idSpell: "",
-                idPosSpell: "",
-                key: "",
-                keyChar: ""
-            },
-            valueKeyMacro: [
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                }
-            ],
-            keyCodeMacros: {},
-            tmpKeyCodeDefault: {},
-            keyCodeDefault: {
-                [this.nameKeyCode.flechaArriba]: 38,
-                [this.nameKeyCode.flechaAbajo]: 40,
-                [this.nameKeyCode.flechaIzquierda]: 37,
-                [this.nameKeyCode.flechaDerecha]: 39,
-                [this.nameKeyCode.usar]: 85,
-                [this.nameKeyCode.atacar]: 17,
-                [this.nameKeyCode.agarrar]: 65,
-                [this.nameKeyCode.tirar]: 84,
-                [this.nameKeyCode.equipar]: 69,
-                [this.nameKeyCode.domar]: 68,
-                [this.nameKeyCode.robar]: 82,
-                [this.nameKeyCode.seguro]: 83
-            },
-            keyCodeDefaultReset: {
-                [this.nameKeyCode.flechaArriba]: 38,
-                [this.nameKeyCode.flechaAbajo]: 40,
-                [this.nameKeyCode.flechaIzquierda]: 37,
-                [this.nameKeyCode.flechaDerecha]: 39,
-                [this.nameKeyCode.usar]: 85,
-                [this.nameKeyCode.atacar]: 17,
-                [this.nameKeyCode.agarrar]: 65,
-                [this.nameKeyCode.tirar]: 84,
-                [this.nameKeyCode.equipar]: 69,
-                [this.nameKeyCode.domar]: 68,
-                [this.nameKeyCode.robar]: 82,
-                [this.nameKeyCode.seguro]: 83
-            },
-            charKeyCodeDefault: {}
-        };
+const DEFAULT_KEY_CODES = {
+    [NAME_KEY_CODE.flechaArriba]: 38,
+    [NAME_KEY_CODE.flechaAbajo]: 40,
+    [NAME_KEY_CODE.flechaIzquierda]: 37,
+    [NAME_KEY_CODE.flechaDerecha]: 39,
+    [NAME_KEY_CODE.usar]: 85,
+    [NAME_KEY_CODE.atacar]: 17,
+    [NAME_KEY_CODE.agarrar]: 65,
+    [NAME_KEY_CODE.tirar]: 84,
+    [NAME_KEY_CODE.equipar]: 69,
+    [NAME_KEY_CODE.domar]: 68,
+    [NAME_KEY_CODE.robar]: 82,
+    [NAME_KEY_CODE.seguro]: 83
+};
 
-        this.macros = [];
-        this.modalMacro = {};
+const EMPTY_MACRO = () => ({ idPosItem: "", idSpell: "", idPosSpell: "", img: "", key: "", keyChar: "" });
+const EMPTY_MACROS = () => Array.from({ length: 6 }, EMPTY_MACRO);
 
-        this.canvas = {
-            background: {},
-            techos: {},
-            foreground: {},
-            items: {},
-            textos: {}
-        };
+const INITIAL_TRADE = {
+    idPosTrade: 0,
+    idPosInv: 0,
+    titleItem: "",
+    infoItem: "",
+    imgItem: "",
+    goldItem: "",
+    itemsTrade: {},
+    itemsUser: {}
+};
 
-        this.clickUse = 0;
-        this.lastClickIdItem = 0;
+const INITIAL_STATE = {
+    showModalControlPanel: false,
+    showInventary: true,
+    showMacroConfig: false,
+    loading: true,
+    user: {},
+    selectItem: 0,
+    showConsole: true,
+    messagesConsole: [],
+    crosshair: false,
+    nameMap: "",
+    showModalReconnect: false,
+    showInputText: false,
+    textDialog: "",
+    showModalTrade: false,
+    trade: { ...INITIAL_TRADE },
+    cantTrade: 1,
+    mapasToLoad: 0,
+    mapasCargados: 0,
+    keyMacro: { indexMacro: "", idPosItem: "", idSpell: "", idPosSpell: "", key: "", keyChar: "" },
+    valueKeyMacro: EMPTY_MACROS(),
+    keyCodeMacros: {},
+    tmpKeyCodeDefault: {},
+    keyCodeDefault: { ...DEFAULT_KEY_CODES },
+    keyCodeDefaultReset: { ...DEFAULT_KEY_CODES },
+    charKeyCodeDefault: {}
+};
 
-        this.pkg = {};
-        this.user = {};
-        this.general = {};
-        this.game = {};
-        this.engine = {};
-        this.messages = {};
-        this.connection = {};
-        this.config = {};
-    }
+// ─── Helper ───────────────────────────────────────────────────────────────────
 
-    charKeyCodeDefault = () => {
-        let { keyCodeDefault, charKeyCodeDefault } = this.state;
+function computeCharKeyCodes(keyCodeDefault, config) {
+    const result = {};
+    Object.keys(keyCodeDefault).forEach(key => {
+        const keyCode = keyCodeDefault[key];
+        let fromChar = String.fromCharCode(keyCode);
+        if (config && config.keyCodeMap && config.keyCodeMap[keyCode]) {
+            fromChar = config.keyCodeMap[keyCode];
+        }
+        result[key] = fromChar;
+    });
+    return result;
+}
 
-        Object.keys(keyCodeDefault).map(key => {
-            const keyCode = keyCodeDefault[key];
+// ─── Component ────────────────────────────────────────────────────────────────
 
-            let fromChar = String.fromCharCode(keyCode);
+function Play() {
+    const [state, setStateFn] = useState(INITIAL_STATE);
 
-            if (this.config.keyCodeMap[keyCode]) {
-                fromChar = this.config.keyCodeMap[keyCode];
-            }
+    // Always-current ref so engine can read state synchronously
+    const stateRef = useRef(state);
+    stateRef.current = state;
 
-            charKeyCodeDefault[key] = fromChar;
+    // DOM refs
+    const consoleRef = useRef(null);
+    const macros = useRef([]);
+    const modalMacro = useRef(null);
+    const canvas = useRef({ pixi: null });
+
+    // Non-state instance values
+    const clickUse = useRef(0);
+    const lastClickIdItem = useRef(0);
+
+    // Engine objects (loaded once in useEffect)
+    const pkgRef = useRef(null);
+    const userRef = useRef(null);
+    const generalRef = useRef(null);
+    const gameRef = useRef(null);
+    const engineRef = useRef(null);
+    const messagesRef = useRef(null);
+    const connectionRef = useRef(null);
+    const configRef = useRef(null);
+
+    // Merge setState that mimics class setState(updates, callback)
+    const setState = useCallback((updates, callback) => {
+        setStateFn(prev => {
+            return typeof updates === "function"
+                ? { ...prev, ...updates(prev) }
+                : { ...prev, ...updates };
         });
+        if (callback) setTimeout(callback, 0);
+    }, []);
 
-        this.setState({
-            charKeyCodeDefault: charKeyCodeDefault
-        });
-    };
+    // Keep a stable ref so the bridge always calls the latest setState
+    const setStateRef = useRef(setState);
+    setStateRef.current = setState;
 
-    async componentDidMount() {
-        inits.setReact(this);
+    // Bridge object passed to engine — mimics class instance API
+    const bridge = useRef({
+        get state() { return stateRef.current; },
+        setState(updates, callback) { setStateRef.current(updates, callback); },
+        get refs() { return { console: consoleRef.current }; }
+    });
 
-        const macros = window.localStorage.getItem("macros");
+    // ── Initialization ────────────────────────────────────────────────────────
 
-        if (macros) {
-            let tmpKeyCodeMacros = {};
-            const jsonMacros = JSON.parse(macros);
+    useEffect(() => {
+        inits.setReact(bridge.current);
 
-            jsonMacros.map((macro, index) => {
-                if (macro.key) {
-                    tmpKeyCodeMacros[macro.key] = index;
-                }
+        const macrosStorage = window.localStorage.getItem("macros");
+        if (macrosStorage) {
+            const jsonMacros = JSON.parse(macrosStorage);
+            const tmpKeyCodeMacros = {};
+            jsonMacros.forEach((macro, index) => {
+                if (macro.key) tmpKeyCodeMacros[macro.key] = index;
             });
-
-            this.setState({
-                valueKeyMacro: jsonMacros,
-                keyCodeMacros: tmpKeyCodeMacros
-            });
+            setState({ valueKeyMacro: jsonMacros, keyCodeMacros: tmpKeyCodeMacros });
         }
 
-        const defaultKeys = window.localStorage.getItem("defaultKeys");
-
-        if (defaultKeys) {
-            const jsonDefaultKeys = JSON.parse(defaultKeys);
-
-            await this.setState({
-                keyCodeDefault: _.cloneDeep(jsonDefaultKeys),
-                tmpKeyCodeDefault: _.cloneDeep(jsonDefaultKeys)
-            });
+        const defaultKeysStorage = window.localStorage.getItem("defaultKeys");
+        let initialKeyCodeDefault = { ...DEFAULT_KEY_CODES };
+        if (defaultKeysStorage) {
+            initialKeyCodeDefault = JSON.parse(defaultKeysStorage);
         }
 
-        this.config = require("../../engine/config").default;
-        const Engine = require("../../engine/engine").default;
-        const General = require("../../engine/general").default;
-        const Messages = require("../../engine/connection/messages").default;
-        const Connection = require("../../engine/connection/connection")
-            .default;
-        const Game = require("../../engine/game").default;
-        const User = require("../../engine/user").default;
-        const Package = require("../../engine/connection/package").default;
+        (async () => {
+            configRef.current = require("../../engine/config").default;
+            const Engine = require("../../engine/engine").default;
+            const General = require("../../engine/general").default;
+            const Messages = require("../../engine/connection/messages").default;
+            const Connection = require("../../engine/connection/connection").default;
+            const Game = require("../../engine/game").default;
+            const User = require("../../engine/user").default;
+            const Package = require("../../engine/connection/package").default;
 
-        this.pkg = new Package();
-        this.user = new User();
+            pkgRef.current = new Package();
+            userRef.current = new User();
+            generalRef.current = new General(pkgRef.current, configRef.current);
+            gameRef.current = new Game(inits, userRef.current, pkgRef.current, configRef.current, bridge.current);
+            engineRef.current = new Engine(
+                inits,
+                userRef.current,
+                pkgRef.current,
+                configRef.current,
+                gameRef.current,
+                canvas.current,
+                bridge.current
+            );
+            messagesRef.current = new Messages(
+                userRef.current,
+                engineRef.current,
+                inits,
+                pkgRef.current,
+                configRef.current,
+                gameRef.current,
+                bridge.current
+            );
+            connectionRef.current = new Connection(
+                messagesRef.current,
+                pkgRef.current,
+                gameRef.current,
+                engineRef.current,
+                userRef.current,
+                configRef.current,
+                bridge.current
+            );
 
-        this.general = new General(this.pkg, this.config);
-        this.game = new Game(inits, this.user, this.pkg, this.config, this);
-        this.engine = new Engine(
-            inits,
-            this.user,
-            this.pkg,
-            this.config,
-            this.game,
-            this.canvas,
-            this
-        );
-        this.messages = new Messages(
-            this.user,
-            this.engine,
-            inits,
-            this.pkg,
-            this.config,
-            this.game,
-            this
-        );
-        this.connection = new Connection(
-            this.messages,
-            this.pkg,
-            this.game,
-            this.engine,
-            this.user,
-            this.config,
-            this
-        );
-
-        this.charKeyCodeDefault();
-
-        await this.engine.initCanvas();
-
-        this.connection.startWebSocket();
-
-        this.setState({
-            loading: false
-        });
-
-        document.oncontextmenu = e => {
-            e.stopPropagation();
-            return false;
-        };
-
-        document.onkeyup = e => {
-            const {
-                selectItem,
-                showInputText,
-                textDialog,
-                showMacroConfig,
-                valueKeyMacro,
-                keyCodeMacros
-            } = this.state;
-            const keyCode = e.keyCode;
-
-            if (showMacroConfig) return;
-
-            if (!showInputText && !isNaN(parseInt(keyCodeMacros[keyCode]))) {
-                const macro = valueKeyMacro[keyCodeMacros[keyCode]];
-
-                if (macro.idPosItem !== "") {
-                    this.game.useItem(macro.idPosItem);
-                } else if (macro.idSpell !== "") {
-                    this.selectSpell(macro.idPosSpell);
-                }
-
-                return;
-            }
-
-            //Usar
-            if (
-                keyCode ==
-                    this.state.keyCodeDefault[this.config.nameKeyCode.usar] &&
-                !showInputText
-            ) {
-                if (selectItem) this.game.useItem(selectItem);
-            }
-
-            //Equipar
-            if (
-                keyCode ==
-                    this.state.keyCodeDefault[
-                        this.config.nameKeyCode.equipar
-                    ] &&
-                !showInputText
-            ) {
-                const item = this.user.items[selectItem];
-
-                if (selectItem && item)
-                    this.game.equiparItem(selectItem, item.idItem);
-            }
-
-            //Agarrar
-            if (
-                keyCode ==
-                    this.state.keyCodeDefault[
-                        this.config.nameKeyCode.agarrar
-                    ] &&
-                !showInputText
-            ) {
-                this.pkg.setPackageID(this.pkg.serverPacketID.agarrarItem);
-                this.config.ws.send(this.pkg.dataSend());
-            }
-
-            //Tirar
-            if (
-                keyCode ==
-                    this.state.keyCodeDefault[this.config.nameKeyCode.tirar] &&
-                !showInputText
-            ) {
-                let cantItem = 1;
-
-                if (selectItem) {
-                    cantItem = prompt("¿Cuántos quieres tirar?", 1);
-                }
-
-                if (cantItem > 0) {
-                    this.pkg.setPackageID(this.pkg.serverPacketID.tirarItem);
-                    this.pkg.writeInt(selectItem);
-                    this.pkg.writeShort(parseInt(cantItem));
-                    this.config.ws.send(this.pkg.dataSend());
-                }
-            }
-
-            //Enter
-            if (keyCode == 13) {
-                if (showInputText) {
-                    this.general.sendDialog(textDialog);
-
-                    this.setState({
-                        textDialog: ""
-                    });
-                }
-
-                this.setState({
-                    showInputText: !showInputText
-                });
-            }
-
-            if (keyCode == 77 && !showInputText) {
-                this.general.sendDialog("/meditar");
-            }
-
-            if (
-                keyCode ==
-                    this.state.keyCodeDefault[this.config.nameKeyCode.seguro] &&
-                !showInputText
-            ) {
-                if (this.config.seguroActivado) {
-                    this.config.seguroActivado = false;
-                } else {
-                    this.config.seguroActivado = true;
-                }
-
-                this.pkg.setPackageID(this.pkg.serverPacketID.changeSeguro);
-                this.config.ws.send(this.pkg.dataSend());
-            }
-            if (
-                keyCode ==
-                this.state.keyCodeDefault[this.config.nameKeyCode.atacar]
-            ) {
-                if (
-                    +Date.now() - this.config.timeHitStart >
-                    this.config.intervalHit
-                ) {
-                    this.engine.hit();
-                }
-            }
-
-            event = event || window.event;
-            if (event.ctrlKey) {
-                const c = event.which || keyCode;
-                switch (c) {
-                    case 83:
-                    case 87:
-                    case 68:
-                        event.preventDefault();
-                        event.stopPropagation();
-                        break;
-                }
-            }
-        };
-    }
-
-    closeModalTrade = () => {
-        this.setState({
-            showModalTrade: false
-        });
-    };
-
-    openConsole = () => {
-        const { showConsole } = this.state;
-
-        this.setState({
-            showConsole: !showConsole
-        });
-    };
-
-    selectItem = i => {
-        const { keyMacro, showMacroConfig, user } = this.state;
-
-        this.setState({
-            selectItem: i
-        });
-
-        if (showMacroConfig) {
-            const items = user.items;
-            const item = items[i];
-
-            if (item) {
-                keyMacro.idSpell = "";
-                keyMacro.idPosItem = i;
-                keyMacro.img = `/static/graficos/${
-                    inits.graphics[item.grhIndex].numFile
-                }.png`;
-            }
-
-            this.setState({
-                keyMacro: keyMacro
+            const charKCs = computeCharKeyCodes(initialKeyCodeDefault, configRef.current);
+            setState({
+                keyCodeDefault: _.cloneDeep(initialKeyCodeDefault),
+                tmpKeyCodeDefault: _.cloneDeep(initialKeyCodeDefault),
+                charKeyCodeDefault: charKCs
             });
 
-            return;
-        }
+            await engineRef.current.initCanvas();
+            connectionRef.current.startWebSocket();
+            setState({ loading: false });
 
-        if (this.clickUse > 1 && this.lastClickIdItem == i) {
-            this.clickUse = 0;
-            this.game.useItem(i);
-        }
+            document.oncontextmenu = e => {
+                e.stopPropagation();
+                return false;
+            };
 
-        this.clickUse++;
+            document.onkeyup = e => {
+                const {
+                    selectItem,
+                    showInputText,
+                    textDialog,
+                    showMacroConfig,
+                    valueKeyMacro,
+                    keyCodeMacros,
+                    keyCodeDefault
+                } = stateRef.current;
+                const keyCode = e.keyCode;
 
-        this.lastClickIdItem = i;
-    };
+                if (showMacroConfig) return;
 
-    selectSpell = i => {
-        const { keyMacro, showMacroConfig } = this.state;
-        const spell = this.user.spells[i];
+                if (!showInputText && !isNaN(parseInt(keyCodeMacros[keyCode]))) {
+                    const macro = valueKeyMacro[keyCodeMacros[keyCode]];
+                    if (macro.idPosItem !== "") {
+                        gameRef.current.useItem(macro.idPosItem);
+                    } else if (macro.idSpell !== "") {
+                        selectSpell_(macro.idPosSpell);
+                    }
+                    return;
+                }
+
+                if (keyCode == keyCodeDefault[configRef.current.nameKeyCode.usar] && !showInputText) {
+                    if (selectItem) gameRef.current.useItem(selectItem);
+                }
+
+                if (keyCode == keyCodeDefault[configRef.current.nameKeyCode.equipar] && !showInputText) {
+                    const item = userRef.current.items[selectItem];
+                    if (selectItem && item) gameRef.current.equiparItem(selectItem, item.idItem);
+                }
+
+                if (keyCode == keyCodeDefault[configRef.current.nameKeyCode.agarrar] && !showInputText) {
+                    pkgRef.current.setPackageID(pkgRef.current.serverPacketID.agarrarItem);
+                    configRef.current.ws.send(pkgRef.current.dataSend());
+                }
+
+                if (keyCode == keyCodeDefault[configRef.current.nameKeyCode.tirar] && !showInputText) {
+                    let cantItem = 1;
+                    if (selectItem) {
+                        cantItem = prompt("¿Cuántos quieres tirar?", 1);
+                    }
+                    if (cantItem > 0) {
+                        pkgRef.current.setPackageID(pkgRef.current.serverPacketID.tirarItem);
+                        pkgRef.current.writeInt(selectItem);
+                        pkgRef.current.writeShort(parseInt(cantItem));
+                        configRef.current.ws.send(pkgRef.current.dataSend());
+                    }
+                }
+
+                if (keyCode == 13) {
+                    if (showInputText) {
+                        generalRef.current.sendDialog(textDialog);
+                        setState({ textDialog: "" });
+                    }
+                    setState({ showInputText: !showInputText });
+                }
+
+                if (keyCode == 77 && !showInputText) {
+                    generalRef.current.sendDialog("/meditar");
+                }
+
+                if (keyCode == keyCodeDefault[configRef.current.nameKeyCode.seguro] && !showInputText) {
+                    configRef.current.seguroActivado = !configRef.current.seguroActivado;
+                    pkgRef.current.setPackageID(pkgRef.current.serverPacketID.changeSeguro);
+                    configRef.current.ws.send(pkgRef.current.dataSend());
+                }
+
+                if (keyCode == keyCodeDefault[configRef.current.nameKeyCode.atacar]) {
+                    if (+Date.now() - configRef.current.timeHitStart > configRef.current.intervalHit) {
+                        engineRef.current.hit();
+                    }
+                }
+
+                e = e || window.event;
+                if (e.ctrlKey) {
+                    const c = e.which || keyCode;
+                    switch (c) {
+                        case 83:
+                        case 87:
+                        case 68:
+                            e.preventDefault();
+                            e.stopPropagation();
+                            break;
+                    }
+                }
+            };
+        })();
+
+        return () => {
+            document.oncontextmenu = null;
+            document.onkeyup = null;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── Helpers needed by keyup handler (stable via refs) ─────────────────────
+
+    const selectSpell_ = useCallback(i => {
+        const { keyMacro, showMacroConfig } = stateRef.current;
+        const spell = userRef.current && userRef.current.spells[i];
 
         if (showMacroConfig && spell) {
-            keyMacro.idSpell = spell.idSpell;
-            keyMacro.idPosSpell = i;
-            keyMacro.idPosItem = "";
-            keyMacro.img = `/static/spells/${spell.idSpell}.png`;
-
-            this.setState({
-                keyMacro: keyMacro
+            setState({
+                keyMacro: {
+                    ...keyMacro,
+                    idSpell: spell.idSpell,
+                    idPosSpell: i,
+                    idPosItem: "",
+                    img: `/static/spells/${spell.idSpell}.png`
+                }
             });
-
             return;
         }
 
-        if (this.user.maxMana > 0) {
-            this.config.hechizoSelected = i;
-            this.setState({
-                crosshair: true
-            });
-            this.game.writeConsole("Haz click sobre el objetivo...", "gray");
+        if (userRef.current && userRef.current.maxMana > 0) {
+            configRef.current.hechizoSelected = i;
+            setState({ crosshair: true });
+            gameRef.current.writeConsole("Haz click sobre el objetivo...", "gray");
         }
-    };
+    }, [setState]);
 
-    clickCanvas = e => {
-        let xCanvas = e.nativeEvent.offsetX;
-        let yCanvas = e.nativeEvent.offsetY;
+    // ── Event handlers ────────────────────────────────────────────────────────
 
-        const posX = Math.round(this.user.pos.x + xCanvas / 32 - 544 / 64);
-        const posY = Math.round(this.user.pos.y + yCanvas / 32 - 544 / 64);
+    const closeModalTrade = () => setState({ showModalTrade: false });
 
-        this.engine.clickCanvas({
-            x: posX,
-            y: posY
-        });
-    };
+    const openConsole = () => setState(prev => ({ showConsole: !prev.showConsole }));
 
-    renderBoxItems = () => {
-        const { user, selectItem } = this.state;
-        const items = user.items || {};
+    const selectItem = i => {
+        const { keyMacro, showMacroConfig } = state;
 
-        let html = [];
+        setState({ selectItem: i });
 
-        for (let i = 1; i < 22; i++) {
-            const item = items[i];
-
-            html.push(
-                <div
-                    className={`${style.slot_inv} ${
-                        selectItem === i ? style.item_selected : ""
-                    }`}
-                    key={i}
-                    onClick={() => this.selectItem(i)}
-                >
-                    <div
-                        className={`${style.img_item} ${
-                            item && !item.validUser ? style.itemNotValid : ""
-                        }`}
-                        style={{
-                            backgroundImage: item
-                                ? `url("/static/graficos/${
-                                      inits.graphics[item.grhIndex].numFile
-                                  }.png")`
-                                : "none"
-                        }}
-                    />
-                    <div className={style.amount}>{item ? item.cant : ""}</div>
-
-                    {item && item.equipped ? (
-                        <div className={style.equipped}>E</div>
-                    ) : null}
-                </div>
-            );
+        if (showMacroConfig) {
+            const item = userRef.current && userRef.current.items[i];
+            if (item) {
+                setState({
+                    keyMacro: {
+                        ...keyMacro,
+                        idSpell: "",
+                        idPosItem: i,
+                        img: `/static/graficos/${inits.graphics[item.grhIndex].numFile}.png`
+                    }
+                });
+            }
+            return;
         }
 
-        return html;
-    };
-
-    renderBoxSpells = () => {
-        const { user } = this.state;
-        const spells = user.spells || {};
-
-        let html = [];
-
-        for (let i = 1; i < 29; i++) {
-            const spell = spells[i];
-
-            html.push(
-                <div
-                    className={style.slot_spell}
-                    key={i}
-                    onClick={() => this.selectSpell(i)}
-                >
-                    <div
-                        className={style.img_spell}
-                        style={{
-                            backgroundImage: spell
-                                ? `url("/static/spells/${spell.idSpell}.png")`
-                                : "none"
-                        }}
-                    />
-                </div>
-            );
+        if (clickUse.current > 1 && lastClickIdItem.current == i) {
+            clickUse.current = 0;
+            gameRef.current.useItem(i);
         }
 
-        return html;
+        clickUse.current++;
+        lastClickIdItem.current = i;
     };
 
-    renderBoxMacros = () => {
-        const { valueKeyMacro } = this.state;
+    const selectSpell = i => selectSpell_(i);
 
-        let html = [];
-
-        for (let i = 0; i < 6; i++) {
-            const macro = valueKeyMacro[i];
-
-            html.push(
-                <div
-                    key={i}
-                    className={style.macro}
-                    onContextMenu={e => this.showMacroConfig(e, i)}
-                    ref={ref => {
-                        this.macros[i] = ref;
-                    }}
-                >
-                    {macro.idPosItem !== "" && macro.img ? (
-                        <div
-                            className={style.item}
-                            style={{
-                                backgroundImage: `url("${macro.img}")`
-                            }}
-                        />
-                    ) : null}
-
-                    {macro.idSpell !== "" && macro.img ? (
-                        <div
-                            className={style.spell}
-                            style={{
-                                backgroundImage: `url("${macro.img}")`
-                            }}
-                        />
-                    ) : null}
-
-                    {macro.keyChar !== "" ? (
-                        <div className={style.key}>{macro.keyChar}</div>
-                    ) : null}
-                </div>
-            );
-        }
-
-        return html;
+    const clickCanvas = e => {
+        const xCanvas = e.nativeEvent.offsetX;
+        const yCanvas = e.nativeEvent.offsetY;
+        const posX = Math.round(userRef.current.pos.x + xCanvas / 32 - 544 / 64);
+        const posY = Math.round(userRef.current.pos.y + yCanvas / 32 - 544 / 64);
+        engineRef.current.clickCanvas({ x: posX, y: posY });
     };
 
-    renderBoxItemsUserTrade = () => {
-        const { trade } = this.state;
-
-        let html = [];
-
-        for (let i = 1; i < 26; i++) {
-            const item = trade.itemsUser[i];
-
-            html.push(
-                <div
-                    className={`${style.slotInventary} ${
-                        trade.idPosInv === i ? style.slotInventarySelected : ""
-                    }`}
-                    key={i}
-                    onClick={() => this.selectItemUserTrade(i)}
-                >
-                    <div
-                        className={`${style.imgItem} ${
-                            item && !item.validUser ? style.itemNotValid : ""
-                        }`}
-                        style={{
-                            backgroundImage: item
-                                ? `url("${item.imgItem}")`
-                                : "none"
-                        }}
-                    />
-                    <div className={style.cant}>{item && item.cant}</div>
-                    {item && item.equipped ? (
-                        <div className={style.equipped}>E</div>
-                    ) : null}
-                </div>
-            );
-        }
-
-        return html;
-    };
-
-    renderBoxItemsTrade = () => {
-        const { trade } = this.state;
-
-        let html = [];
-
-        for (let i = 1; i < 26; i++) {
-            const item = trade.itemsTrade[i];
-
-            html.push(
-                <div
-                    className={`${style.slotTrade} ${
-                        item && !item.validUser ? style.itemNotValid : ""
-                    } ${trade.idPosTrade === i ? style.slotTradeSelected : ""}`}
-                    key={i}
-                    onClick={() => this.selectItemTrade(i)}
-                >
-                    <div
-                        className={style.imgItem}
-                        style={{
-                            backgroundImage: item
-                                ? `url("${item.imgItem}")`
-                                : "none"
-                        }}
-                    />
-                </div>
-            );
-        }
-
-        return html;
-    };
-
-    selectItemUserTrade = i => {
-        const { trade } = this.state;
-
+    const selectItemUserTrade = i => {
+        const { trade } = state;
         const item = trade.itemsUser[i];
-
-        trade.idPosInv = i;
-
-        if (item) {
-            trade.titleItem = item.name;
-            trade.infoItem = item.info;
-            trade.imgItem = item.imgItem;
-            trade.goldItem = item.gold;
-        } else {
-            trade.titleItem = "";
-            trade.infoItem = "";
-            trade.imgItem = "";
-            trade.goldItem = "";
-        }
-
-        this.setState({
-            trade: trade
+        setState({
+            trade: {
+                ...trade,
+                idPosInv: i,
+                titleItem: item ? item.name : "",
+                infoItem: item ? item.info : "",
+                imgItem: item ? item.imgItem : "",
+                goldItem: item ? item.gold : ""
+            }
         });
     };
 
-    selectItemTrade = i => {
-        const { trade } = this.state;
-
+    const selectItemTrade = i => {
+        const { trade } = state;
         const item = trade.itemsTrade[i];
-
-        trade.idPosTrade = i;
-
-        if (item) {
-            trade.titleItem = item.name;
-            trade.infoItem = item.info;
-            trade.imgItem = item.imgItem;
-            trade.goldItem = item.gold;
-        } else {
-            trade.titleItem = "";
-            trade.infoItem = "";
-            trade.imgItem = "";
-            trade.goldItem = "";
-        }
-
-        this.setState({
-            trade: trade
+        setState({
+            trade: {
+                ...trade,
+                idPosTrade: i,
+                titleItem: item ? item.name : "",
+                infoItem: item ? item.info : "",
+                imgItem: item ? item.imgItem : "",
+                goldItem: item ? item.gold : ""
+            }
         });
     };
 
-    buyTrade = () => {
-        const { trade, cantTrade } = this.state;
-
+    const buyTrade = () => {
+        const { trade, cantTrade } = state;
         if (trade.idPosTrade) {
-            this.pkg.setPackageID(this.pkg.serverPacketID.buyItem);
-            this.pkg.writeByte(trade.idPosTrade);
-            this.pkg.writeShort(cantTrade);
-            this.config.ws.send(this.pkg.dataSend());
+            pkgRef.current.setPackageID(pkgRef.current.serverPacketID.buyItem);
+            pkgRef.current.writeByte(trade.idPosTrade);
+            pkgRef.current.writeShort(cantTrade);
+            configRef.current.ws.send(pkgRef.current.dataSend());
         }
     };
 
-    sellTrade = () => {
-        const { trade, cantTrade } = this.state;
-
+    const sellTrade = () => {
+        const { trade, cantTrade } = state;
         if (trade.idPosInv) {
-            this.pkg.setPackageID(this.pkg.serverPacketID.sellItem);
-            this.pkg.writeByte(trade.idPosInv);
-            this.pkg.writeShort(cantTrade);
-            this.config.ws.send(this.pkg.dataSend());
+            pkgRef.current.setPackageID(pkgRef.current.serverPacketID.sellItem);
+            pkgRef.current.writeByte(trade.idPosInv);
+            pkgRef.current.writeShort(cantTrade);
+            configRef.current.ws.send(pkgRef.current.dataSend());
         }
     };
 
-    showInventary = () => {
-        this.setState({
-            showInventary: true
-        });
-    };
+    const showInventary = () => setState({ showInventary: true });
+    const showSpells = () => setState({ showInventary: false });
 
-    showSpells = () => {
-        this.setState({
-            showInventary: false
-        });
-    };
-
-    showMacroConfig = (e, key) => {
-        let { keyMacro } = this.state;
-
+    const showMacroConfig = (e, key) => {
         e.preventDefault();
-
-        const refMacro = this.macros[key];
-
-        this.modalMacro.style.left = `${refMacro.offsetLeft - 57}px`;
-        this.modalMacro.style.top = `${refMacro.offsetTop - 210}px`;
-
-        keyMacro = {
-            indexMacro: key,
-            idPosItem: "",
-            idPosSpell: "",
-            idSpell: "",
-            key: "",
-            keyChar: ""
-        };
-
-        this.setState({
+        const refMacro = macros.current[key];
+        modalMacro.current.style.left = `${refMacro.offsetLeft - 57}px`;
+        modalMacro.current.style.top = `${refMacro.offsetTop - 210}px`;
+        setState({
             showMacroConfig: true,
-            keyMacro: keyMacro
+            keyMacro: { indexMacro: key, idPosItem: "", idPosSpell: "", idSpell: "", key: "", keyChar: "" }
         });
     };
 
-    handleKeyMacro = e => {
-        const { keyMacro, keyCodeMacros, keyCodeDefault } = this.state;
+    const handleKeyMacro = e => {
+        const { keyMacro, keyCodeMacros, keyCodeDefault } = state;
         const keyCode = e.keyCode;
 
-        if (
-            Object.values(keyCodeDefault).indexOf(keyCode) > -1 ||
-            !isNaN(parseInt(keyCodeMacros[keyCode]))
-        ) {
-            keyMacro.key = "";
-            keyMacro.keyChar = "";
+        if (Object.values(keyCodeDefault).indexOf(keyCode) > -1 || !isNaN(parseInt(keyCodeMacros[keyCode]))) {
             alert("La tecla ya está asignada");
         } else {
             let fromChar = String.fromCharCode(keyCode);
-
-            if (this.config.keyCodeMap[keyCode]) {
-                fromChar = this.config.keyCodeMap[keyCode];
+            if (configRef.current && configRef.current.keyCodeMap[keyCode]) {
+                fromChar = configRef.current.keyCodeMap[keyCode];
             }
-
-            keyMacro.key = keyCode;
-            keyMacro.keyChar = fromChar;
+            setState({ keyMacro: { ...keyMacro, key: keyCode, keyChar: fromChar } });
         }
-
-        this.setState({
-            keyMacro: keyMacro
-        });
     };
 
-    saveMacro = () => {
-        const { keyMacro, valueKeyMacro, keyCodeMacros } = this.state;
-
-        valueKeyMacro[keyMacro.indexMacro] = {
+    const saveMacro = () => {
+        const { keyMacro, valueKeyMacro, keyCodeMacros } = state;
+        const newMacros = [...valueKeyMacro];
+        newMacros[keyMacro.indexMacro] = {
             idPosItem: keyMacro.idPosItem,
             idSpell: keyMacro.idSpell,
             idPosSpell: keyMacro.idPosSpell,
@@ -841,789 +487,593 @@ class Home extends React.Component {
             key: keyMacro.key,
             keyChar: keyMacro.keyChar
         };
-
-        keyCodeMacros[keyMacro.key] = keyMacro.indexMacro;
-
-        this.setState({
-            valueKeyMacro: valueKeyMacro,
-            keyCodeMacros: keyCodeMacros,
-            showMacroConfig: false
-        });
-
-        window.localStorage.setItem("macros", JSON.stringify(valueKeyMacro));
+        const newKeyCodeMacros = { ...keyCodeMacros, [keyMacro.key]: keyMacro.indexMacro };
+        setState({ valueKeyMacro: newMacros, keyCodeMacros: newKeyCodeMacros, showMacroConfig: false });
+        window.localStorage.setItem("macros", JSON.stringify(newMacros));
     };
 
-    handleKeyDefault = (e, keyType) => {
-        const {
-            keyCodeMacros,
-            charKeyCodeDefault,
-            tmpKeyCodeDefault
-        } = this.state;
+    const handleKeyDefault = (e, keyType) => {
+        const { keyCodeMacros, charKeyCodeDefault, tmpKeyCodeDefault } = state;
         const keyCode = e.keyCode;
 
-        if (
-            Object.values(tmpKeyCodeDefault).indexOf(keyCode) > -1 ||
-            !isNaN(parseInt(keyCodeMacros[keyCode]))
-        ) {
+        if (Object.values(tmpKeyCodeDefault).indexOf(keyCode) > -1 || !isNaN(parseInt(keyCodeMacros[keyCode]))) {
             alert("La tecla ya está asignada");
         } else {
             let fromChar = String.fromCharCode(keyCode);
-
-            if (this.config.keyCodeMap[keyCode]) {
-                fromChar = this.config.keyCodeMap[keyCode];
+            if (configRef.current && configRef.current.keyCodeMap[keyCode]) {
+                fromChar = configRef.current.keyCodeMap[keyCode];
             }
-
-            tmpKeyCodeDefault[keyType] = keyCode;
-            charKeyCodeDefault[keyType] = fromChar;
+            setState({
+                tmpKeyCodeDefault: { ...tmpKeyCodeDefault, [keyType]: keyCode },
+                charKeyCodeDefault: { ...charKeyCodeDefault, [keyType]: fromChar }
+            });
         }
+    };
 
-        this.setState({
-            charKeyCodeDefault: charKeyCodeDefault,
-            tmpKeyCodeDefault: tmpKeyCodeDefault
+    const restoreDefaultKeys = () => {
+        const { keyCodeDefaultReset } = state;
+        window.localStorage.setItem("defaultKeys", JSON.stringify(keyCodeDefaultReset));
+        const newKeys = _.cloneDeep(keyCodeDefaultReset);
+        const charKCs = computeCharKeyCodes(newKeys, configRef.current);
+        setState({
+            keyCodeDefault: newKeys,
+            tmpKeyCodeDefault: _.cloneDeep(keyCodeDefaultReset),
+            charKeyCodeDefault: charKCs
         });
     };
 
-    restoreDefaultKeys = async () => {
-        const { keyCodeDefaultReset } = this.state;
-
-        window.localStorage.setItem(
-            "defaultKeys",
-            JSON.stringify(keyCodeDefaultReset)
-        );
-
-        await this.setState({
-            keyCodeDefault: _.cloneDeep(keyCodeDefaultReset),
-            tmpKeyCodeDefault: _.cloneDeep(keyCodeDefaultReset)
-        });
-
-        this.charKeyCodeDefault();
-    };
-
-    saveChangesKeys = () => {
-        const { tmpKeyCodeDefault } = this.state;
-
-        window.localStorage.setItem(
-            "defaultKeys",
-            JSON.stringify(tmpKeyCodeDefault)
-        );
-
-        this.setState({
-            keyCodeDefault: _.cloneDeep(tmpKeyCodeDefault)
-        });
-
+    const saveChangesKeys = () => {
+        const { tmpKeyCodeDefault } = state;
+        window.localStorage.setItem("defaultKeys", JSON.stringify(tmpKeyCodeDefault));
+        setState({ keyCodeDefault: _.cloneDeep(tmpKeyCodeDefault) });
         alert("Teclas guardadas.");
     };
 
-    restoreMacros = () => {
+    const restoreMacros = () => {
         window.localStorage.setItem("macros", "");
-
-        this.setState({
-            keyCodeMacros: {},
-            valueKeyMacro: [
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                },
-                {
-                    idPosItem: "",
-                    idSpell: "",
-                    idPosSpell: "",
-                    img: "",
-                    key: "",
-                    keyChar: ""
-                }
-            ]
-        });
-
+        setState({ keyCodeMacros: {}, valueKeyMacro: EMPTY_MACROS() });
         alert("Macros reseteados.");
     };
 
-    render() {
-        const {
-            showInventary,
-            showMacroConfig,
-            loading,
-            user,
-            showConsole,
-            messagesConsole,
-            crosshair,
-            nameMap,
-            showInputText,
-            textDialog,
-            showModalTrade,
-            trade,
-            cantTrade,
-            mapasToLoad,
-            mapasCargados,
-            keyMacro,
-            showModalControlPanel,
-            keyCodeDefault,
-            charKeyCodeDefault
-        } = this.state;
+    // ── Render helpers ────────────────────────────────────────────────────────
 
-        return (
-            <React.Fragment>
+    const renderBoxItems = () => {
+        const { user, selectItem: selectedItem } = state;
+        const items = user.items || {};
+        const html = [];
+
+        for (let i = 1; i < 22; i++) {
+            const item = items[i];
+            html.push(
                 <div
-                    className={style.progressBar}
-                    style={{ display: loading ? "block" : "none" }}
-                >
-                    <div className={style.logo_tmp} />
-                    <div className={style.text}>
-                        <span id="porcentajeBarra">
-                            {mapasCargados} / {mapasToLoad} Mapas
-                        </span>
-                    </div>
-                    <div className={style.contentBar}>
-                        <div className={style.carga} />
-                        <div
-                            className={style.barra}
-                            style={{
-                                width: `${(mapasCargados * 578) /
-                                    mapasToLoad}px`
-                            }}
-                        />
-                    </div>
-                    <div className={style.contBox}>
-                        <div className={style.help}>
-                            <p>Mover: Flechas</p>
-                            <p>Atacar: Ctrl</p>
-                            <p>Agarrar: A</p>
-                            <p>Usar: U</p>
-                            <p>Tirar: T</p>
-                            <p>Seguro: S</p>
-                            <p>Meditar: M</p>
-                            <p>Hablar: Enter</p>
-                        </div>
-                        <div className={style.news}>
-                            <div className={style.news_content}>
-                                <div className={style.title}>
-                                    Actualización 03/06/2016
-                                </div>
-                                <p>- Volvimos!.</p>
-                                <p>
-                                    - Síguemos en nuestra página de{" "}
-                                    <a
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        href="https://www.facebook.com/ArgentumOnlineWeb"
-                                    >
-                                        Facebook
-                                    </a>{" "}
-                                    para más novedades!
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <ul className={style.modalInfo} />
-
-                <div
-                    className={style.modalControlPanel}
-                    style={{
-                        display: showModalControlPanel ? "block" : "none"
-                    }}
+                    className={`${style.slot_inv} ${selectedItem === i ? style.item_selected : ""}`}
+                    key={i}
+                    onClick={() => selectItem(i)}
                 >
                     <div
-                        className={style.closeControlPanel}
-                        onClick={() => {
-                            this.setState({ showModalControlPanel: false });
+                        className={`${style.img_item} ${item && !item.validUser ? style.itemNotValid : ""}`}
+                        style={{
+                            backgroundImage: item
+                                ? `url("/static/graficos/${inits.graphics[item.grhIndex].numFile}.png")`
+                                : "none"
                         }}
                     />
-                    <div className={style.sound} />
-                    <div className={style.teclas}>
-                        <input
-                            type="text"
-                            className={`${style.tecla} ${
-                                style.margin_left_tecla
-                            }`}
-                            value={
-                                charKeyCodeDefault[
-                                    this.nameKeyCode.flechaArriba
-                                ]
-                            }
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.flechaArriba
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={
-                                charKeyCodeDefault[this.nameKeyCode.flechaAbajo]
-                            }
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.flechaAbajo
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={
-                                charKeyCodeDefault[
-                                    this.nameKeyCode.flechaIzquierda
-                                ]
-                            }
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.flechaIzquierda
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={
-                                charKeyCodeDefault[
-                                    this.nameKeyCode.flechaDerecha
-                                ]
-                            }
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.flechaDerecha
-                                );
-                            }}
-                        />
-
-                        <input
-                            type="text"
-                            className={`${style.tecla} ${
-                                style.margin_left_tecla
-                            }`}
-                            value={charKeyCodeDefault[this.nameKeyCode.usar]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(e, this.nameKeyCode.usar);
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={charKeyCodeDefault[this.nameKeyCode.atacar]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.atacar
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={charKeyCodeDefault[this.nameKeyCode.agarrar]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.agarrar
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={charKeyCodeDefault[this.nameKeyCode.tirar]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.tirar
-                                );
-                            }}
-                        />
-
-                        <input
-                            type="text"
-                            className={`${style.tecla} ${
-                                style.margin_left_tecla
-                            }`}
-                            value={charKeyCodeDefault[this.nameKeyCode.equipar]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.equipar
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={charKeyCodeDefault[this.nameKeyCode.domar]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.domar
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={charKeyCodeDefault[this.nameKeyCode.robar]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.robar
-                                );
-                            }}
-                        />
-                        <input
-                            type="text"
-                            className={style.tecla}
-                            value={charKeyCodeDefault[this.nameKeyCode.seguro]}
-                            onKeyUp={e => {
-                                this.handleKeyDefault(
-                                    e,
-                                    this.nameKeyCode.seguro
-                                );
-                            }}
-                        />
-
-                        <div
-                            className={style.default_teclas}
-                            onClick={this.restoreDefaultKeys}
-                        />
-                        <div
-                            className={style.save_cambios}
-                            onClick={this.saveChangesKeys}
-                        />
-                        <div
-                            className={style.reset_macros}
-                            onClick={this.restoreMacros}
-                        />
-                    </div>
+                    <div className={style.amount}>{item ? item.cant : ""}</div>
+                    {item && item.equipped ? <div className={style.equipped}>E</div> : null}
                 </div>
+            );
+        }
 
-                <div
-                    className={style.modalReconnect}
-                    style={{ top: "285px", left: "638.5px" }}
-                />
+        return html;
+    };
 
+    const renderBoxSpells = () => {
+        const { user } = state;
+        const spells = user.spells || {};
+        const html = [];
+
+        for (let i = 1; i < 29; i++) {
+            const spell = spells[i];
+            html.push(
+                <div className={style.slot_spell} key={i} onClick={() => selectSpell(i)}>
+                    <div
+                        className={style.img_spell}
+                        style={{
+                            backgroundImage: spell ? `url("/static/spells/${spell.idSpell}.png")` : "none"
+                        }}
+                    />
+                </div>
+            );
+        }
+
+        return html;
+    };
+
+    const renderBoxMacros = () => {
+        const { valueKeyMacro } = state;
+        const html = [];
+
+        for (let i = 0; i < 6; i++) {
+            const macro = valueKeyMacro[i];
+            html.push(
                 <div
-                    className={style.modalMacro}
-                    style={{ display: showMacroConfig ? "block" : "none" }}
-                    ref={ref => {
-                        this.modalMacro = ref;
-                    }}
+                    key={i}
+                    className={style.macro}
+                    onContextMenu={e => showMacroConfig(e, i)}
+                    ref={ref => { macros.current[i] = ref; }}
+                >
+                    {macro.idPosItem !== "" && macro.img ? (
+                        <div className={style.item} style={{ backgroundImage: `url("${macro.img}")` }} />
+                    ) : null}
+                    {macro.idSpell !== "" && macro.img ? (
+                        <div className={style.spell} style={{ backgroundImage: `url("${macro.img}")` }} />
+                    ) : null}
+                    {macro.keyChar !== "" ? <div className={style.key}>{macro.keyChar}</div> : null}
+                </div>
+            );
+        }
+
+        return html;
+    };
+
+    const renderBoxItemsUserTrade = () => {
+        const { trade } = state;
+        const html = [];
+
+        for (let i = 1; i < 26; i++) {
+            const item = trade.itemsUser[i];
+            html.push(
+                <div
+                    className={`${style.slotInventary} ${trade.idPosInv === i ? style.slotInventarySelected : ""}`}
+                    key={i}
+                    onClick={() => selectItemUserTrade(i)}
                 >
                     <div
-                        className={`${style.cruz} ${style.closeMacro}`}
-                        onClick={() => {
-                            this.setState({ showMacroConfig: false });
-                        }}
+                        className={`${style.imgItem} ${item && !item.validUser ? style.itemNotValid : ""}`}
+                        style={{ backgroundImage: item ? `url("${item.imgItem}")` : "none" }}
+                    />
+                    <div className={style.cant}>{item && item.cant}</div>
+                    {item && item.equipped ? <div className={style.equipped}>E</div> : null}
+                </div>
+            );
+        }
+
+        return html;
+    };
+
+    const renderBoxItemsTrade = () => {
+        const { trade } = state;
+        const html = [];
+
+        for (let i = 1; i < 26; i++) {
+            const item = trade.itemsTrade[i];
+            html.push(
+                <div
+                    className={`${style.slotTrade} ${item && !item.validUser ? style.itemNotValid : ""} ${trade.idPosTrade === i ? style.slotTradeSelected : ""}`}
+                    key={i}
+                    onClick={() => selectItemTrade(i)}
+                >
+                    <div
+                        className={style.imgItem}
+                        style={{ backgroundImage: item ? `url("${item.imgItem}")` : "none" }}
+                    />
+                </div>
+            );
+        }
+
+        return html;
+    };
+
+    // ── Render ────────────────────────────────────────────────────────────────
+
+    const {
+        showInventary: showInv,
+        showMacroConfig: showMacro,
+        loading,
+        user,
+        showConsole,
+        messagesConsole,
+        crosshair,
+        nameMap,
+        showInputText,
+        textDialog,
+        showModalTrade,
+        trade,
+        cantTrade,
+        mapasToLoad,
+        mapasCargados,
+        keyMacro,
+        showModalControlPanel,
+        keyCodeDefault,
+        charKeyCodeDefault
+    } = state;
+
+    return (
+        <React.Fragment>
+            <div
+                className={style.progressBar}
+                style={{ display: loading ? "block" : "none" }}
+            >
+                <div className={style.logo_tmp} />
+                <div className={style.text}>
+                    <span id="porcentajeBarra">
+                        {mapasCargados} / {mapasToLoad} Mapas
+                    </span>
+                </div>
+                <div className={style.contentBar}>
+                    <div className={style.carga} />
+                    <div
+                        className={style.barra}
+                        style={{ width: `${(mapasCargados * 578) / mapasToLoad}px` }}
+                    />
+                </div>
+                <div className={style.contBox}>
+                    <div className={style.help}>
+                        <p>Mover: Flechas</p>
+                        <p>Atacar: Ctrl</p>
+                        <p>Agarrar: A</p>
+                        <p>Usar: U</p>
+                        <p>Tirar: T</p>
+                        <p>Seguro: S</p>
+                        <p>Meditar: M</p>
+                        <p>Hablar: Enter</p>
+                    </div>
+                    <div className={style.news}>
+                        <div className={style.news_content}>
+                            <div className={style.title}>
+                                Actualización 03/06/2016
+                            </div>
+                            <p>- Volvimos!.</p>
+                            <p>
+                                - Síguemos en nuestra página de{" "}
+                                <a
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    href="https://www.facebook.com/ArgentumOnlineWeb"
+                                >
+                                    Facebook
+                                </a>{" "}
+                                para más novedades!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <ul className={style.modalInfo} />
+
+            <div
+                className={style.modalControlPanel}
+                style={{ display: showModalControlPanel ? "block" : "none" }}
+            >
+                <div
+                    className={style.closeControlPanel}
+                    onClick={() => setState({ showModalControlPanel: false })}
+                />
+                <div className={style.sound} />
+                <div className={style.teclas}>
+                    <input
+                        type="text"
+                        className={`${style.tecla} ${style.margin_left_tecla}`}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.flechaArriba] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.flechaArriba)}
                     />
                     <input
                         type="text"
-                        onKeyUp={this.handleKeyMacro}
-                        className={style.keyMacro}
-                        value={keyMacro.keyChar}
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.flechaAbajo] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.flechaAbajo)}
                     />
-                    <div className={style.img}>
-                        {keyMacro.idPosItem && keyMacro.img ? (
-                            <div
-                                className={style.item}
-                                style={{
-                                    backgroundImage: `url("${keyMacro.img}")`
-                                }}
-                            />
-                        ) : null}
-
-                        {keyMacro.idSpell && keyMacro.img ? (
-                            <div
-                                className={style.spell}
-                                style={{
-                                    backgroundImage: `url("${keyMacro.img}")`
-                                }}
-                            />
-                        ) : null}
-                    </div>
-                    <div
-                        className={style.guardarMacro}
-                        onClick={this.saveMacro}
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.flechaIzquierda] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.flechaIzquierda)}
                     />
-                </div>
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.flechaDerecha] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.flechaDerecha)}
+                    />
 
-                <div
-                    className={style.modalTrade}
-                    style={{ display: showModalTrade ? "block" : "none" }}
-                >
-                    <div className={style.headTrade}>
-                        <div className={style.imgItemTrade}>
-                            <div
-                                className={style.imgItem}
-                                style={{
-                                    backgroundImage: trade.imgItem
-                                        ? `url("${trade.imgItem}")`
-                                        : "none"
-                                }}
-                            />
-                        </div>
-                        <div className={style.titleAndGold}>
-                            <div className={style.titleItemTrade}>
-                                {trade.titleItem}
-                            </div>
-                            <div className={style.infoItem}>
-                                {trade.infoItem}
-                            </div>
-                            <div className={style.goldItemTrade}>
-                                {trade.goldItem}
-                            </div>
-                        </div>
-                        <div
-                            className={style.closeTrade}
-                            onClick={this.closeModalTrade}
-                        />
-                    </div>
-                    <div className={style.itemsTrade}>
-                        <div className={style.trade}>
-                            {this.renderBoxItemsTrade()}
-                        </div>
-                        <div className={style.inventary}>
-                            {this.renderBoxItemsUserTrade()}
-                        </div>
-                    </div>
-                    <div className={style.footerTrade}>
-                        <div
-                            className={style.buttonBuy}
-                            onClick={this.buyTrade}
-                        />
-                        <div className={style.buttonLess} />
-                        <input
-                            type="text"
-                            className={style.cantTrade}
-                            value={cantTrade}
-                            onChange={e => {
-                                this.setState({ cantTrade: e.target.value });
-                            }}
-                        />
-                        <div className={style.buttonMore} />
-                        <div
-                            className={style.buttonSell}
-                            onClick={this.sellTrade}
-                        />
-                    </div>
-                </div>
+                    <input
+                        type="text"
+                        className={`${style.tecla} ${style.margin_left_tecla}`}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.usar] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.usar)}
+                    />
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.atacar] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.atacar)}
+                    />
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.agarrar] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.agarrar)}
+                    />
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.tirar] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.tirar)}
+                    />
 
+                    <input
+                        type="text"
+                        className={`${style.tecla} ${style.margin_left_tecla}`}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.equipar] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.equipar)}
+                    />
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.domar] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.domar)}
+                    />
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.robar] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.robar)}
+                    />
+                    <input
+                        type="text"
+                        className={style.tecla}
+                        value={charKeyCodeDefault[NAME_KEY_CODE.seguro] || ""}
+                        onChange={() => {}}
+                        onKeyUp={e => handleKeyDefault(e, NAME_KEY_CODE.seguro)}
+                    />
+
+                    <div className={style.default_teclas} onClick={restoreDefaultKeys} />
+                    <div className={style.save_cambios} onClick={saveChangesKeys} />
+                    <div className={style.reset_macros} onClick={restoreMacros} />
+                </div>
+            </div>
+
+            <div
+                className={style.modalReconnect}
+                style={{ top: "285px", left: "638.5px" }}
+            />
+
+            <div
+                className={style.modalMacro}
+                style={{ display: showMacro ? "block" : "none" }}
+                ref={modalMacro}
+            >
                 <div
-                    className={style.outer}
-                    style={{ display: loading ? "none" : "table" }}
-                >
-                    <div className={style.middle}>
-                        <div className={style.content}>
-                            <div className={style.content_left}>
-                                <div className={style.render}>
-                                    <input
-                                        type="text"
-                                        name="text"
-                                        autoFocus
-                                        ref={input => input && input.focus()}
-                                        className={style.text}
-                                        style={{
-                                            display: showInputText
-                                                ? "block"
-                                                : "none"
-                                        }}
-                                        value={textDialog}
-                                        onChange={e => {
-                                            this.setState({
-                                                textDialog: e.target.value
-                                            });
-                                        }}
-                                    />
-                                    <canvas
-                                        width="544"
-                                        height="544"
-                                        id="background"
-                                        className={style.background}
-                                        ref={ref => {
-                                            this.canvas.background = ref;
-                                        }}
-                                    />
-                                    <canvas
-                                        width="544"
-                                        height="544"
-                                        id="foreground"
-                                        className={style.foreground}
-                                        ref={ref => {
-                                            this.canvas.foreground = ref;
-                                        }}
-                                    />
-                                    <canvas
-                                        width="544"
-                                        height="544"
-                                        id="items"
-                                        className={style.items}
-                                        ref={ref => {
-                                            this.canvas.items = ref;
-                                        }}
-                                    />
-                                    <canvas
-                                        width="544"
-                                        height="544"
-                                        id="techos"
-                                        className={style.techos}
-                                        ref={ref => {
-                                            this.canvas.techos = ref;
-                                        }}
-                                    />
-                                    <canvas
-                                        width="544"
-                                        height="544"
-                                        id="textos"
-                                        className={style.textos}
-                                        ref={ref => {
-                                            this.canvas.textos = ref;
-                                        }}
-                                    />
-                                    <canvas
-                                        width="544"
-                                        height="544"
-                                        id="mouseEvent"
-                                        className={style.mouseEvent}
-                                        onClick={this.clickCanvas}
-                                        style={{
-                                            cursor: crosshair
-                                                ? "crosshair"
-                                                : "default"
-                                        }}
-                                    />
-                                    <div
-                                        id="console"
-                                        ref="console"
-                                        className={style.console}
-                                        style={{
-                                            display: showConsole
-                                                ? "block"
-                                                : "none"
-                                        }}
-                                    >
-                                        {messagesConsole}
-                                    </div>
-                                    <div
-                                        className={style.openConsole}
-                                        title="Abrir o cerrar consola"
-                                        onClick={this.openConsole}
-                                    >
-                                        <FontAwesomeIcon icon={faComment} />
-                                    </div>
+                    className={`${style.cruz} ${style.closeMacro}`}
+                    onClick={() => setState({ showMacroConfig: false })}
+                />
+                <input
+                    type="text"
+                    onKeyUp={handleKeyMacro}
+                    className={style.keyMacro}
+                    value={keyMacro.keyChar}
+                    onChange={() => {}}
+                />
+                <div className={style.img}>
+                    {keyMacro.idPosItem && keyMacro.img ? (
+                        <div className={style.item} style={{ backgroundImage: `url("${keyMacro.img}")` }} />
+                    ) : null}
+                    {keyMacro.idSpell && keyMacro.img ? (
+                        <div className={style.spell} style={{ backgroundImage: `url("${keyMacro.img}")` }} />
+                    ) : null}
+                </div>
+                <div className={style.guardarMacro} onClick={saveMacro} />
+            </div>
+
+            <div
+                className={style.modalTrade}
+                style={{ display: showModalTrade ? "block" : "none" }}
+            >
+                <div className={style.headTrade}>
+                    <div className={style.imgItemTrade}>
+                        <div
+                            className={style.imgItem}
+                            style={{ backgroundImage: trade.imgItem ? `url("${trade.imgItem}")` : "none" }}
+                        />
+                    </div>
+                    <div className={style.titleAndGold}>
+                        <div className={style.titleItemTrade}>{trade.titleItem}</div>
+                        <div className={style.infoItem}>{trade.infoItem}</div>
+                        <div className={style.goldItemTrade}>{trade.goldItem}</div>
+                    </div>
+                    <div className={style.closeTrade} onClick={closeModalTrade} />
+                </div>
+                <div className={style.itemsTrade}>
+                    <div className={style.trade}>{renderBoxItemsTrade()}</div>
+                    <div className={style.inventary}>{renderBoxItemsUserTrade()}</div>
+                </div>
+                <div className={style.footerTrade}>
+                    <div className={style.buttonBuy} onClick={buyTrade} />
+                    <div className={style.buttonLess} />
+                    <input
+                        type="text"
+                        className={style.cantTrade}
+                        value={cantTrade}
+                        onChange={e => setState({ cantTrade: e.target.value })}
+                    />
+                    <div className={style.buttonMore} />
+                    <div className={style.buttonSell} onClick={sellTrade} />
+                </div>
+            </div>
+
+            <div
+                className={style.outer}
+                style={{ display: loading ? "none" : "table" }}
+            >
+                <div className={style.middle}>
+                    <div className={style.content}>
+                        <div className={style.content_left}>
+                            <div className={style.render}>
+                                <input
+                                    type="text"
+                                    name="text"
+                                    autoFocus
+                                    ref={input => input && input.focus()}
+                                    className={style.text}
+                                    style={{ display: showInputText ? "block" : "none" }}
+                                    value={textDialog}
+                                    onChange={e => setState({ textDialog: e.target.value })}
+                                />
+                                <canvas
+                                    width="544"
+                                    height="544"
+                                    id="pixi"
+                                    className={style.pixi}
+                                    ref={ref => { canvas.current.pixi = ref; }}
+                                    onClick={clickCanvas}
+                                    style={{ cursor: crosshair ? "crosshair" : "default" }}
+                                />
+                                <div
+                                    id="console"
+                                    ref={consoleRef}
+                                    className={style.console}
+                                    style={{ display: showConsole ? "block" : "none" }}
+                                >
+                                    {messagesConsole}
                                 </div>
-
-                                <div className={style.macros}>
-                                    {this.renderBoxMacros()}
+                                <div
+                                    className={style.openConsole}
+                                    title="Abrir o cerrar consola"
+                                    onClick={openConsole}
+                                >
+                                    <FontAwesomeIcon icon={faComment} />
                                 </div>
                             </div>
-                            <div className={style.content_right}>
-                                <div className={style.header}>
-                                    <div className={style.level}>
-                                        {user.level}
-                                    </div>
+
+                            <div className={style.macros}>
+                                {renderBoxMacros()}
+                            </div>
+                        </div>
+                        <div className={style.content_right}>
+                            <div className={style.header}>
+                                <div className={style.level}>{user.level}</div>
+                                <div
+                                    className={style.configuration}
+                                    onClick={() => {
+                                        const newTmpKeys = _.cloneDeep(keyCodeDefault);
+                                        const charKCs = computeCharKeyCodes(newTmpKeys, configRef.current);
+                                        setState({
+                                            showModalControlPanel: true,
+                                            tmpKeyCodeDefault: newTmpKeys,
+                                            charKeyCodeDefault: charKCs
+                                        });
+                                    }}
+                                />
+                                <div className={style.name}>{user.nameCharacter}</div>
+                                <div className={style.exp}>
                                     <div
-                                        className={style.configuration}
-                                        onClick={async () => {
-                                            await this.setState({
-                                                showModalControlPanel: true,
-                                                tmpKeyCodeDefault: _.cloneDeep(
-                                                    keyCodeDefault
-                                                )
-                                            });
-                                            this.charKeyCodeDefault();
+                                        className={style.progress_bar}
+                                        style={{
+                                            width: `${(((user.exp * 100) / user.expNextLevel) * (configRef.current ? configRef.current.xpLength : 0)) / 100}px`
                                         }}
                                     />
-                                    <div className={style.name}>
-                                        {user.nameCharacter}
+                                    <div className={style.porcentaje}>{`${((user.exp * 100) / user.expNextLevel).toFixed(2)}%`}</div>
+                                    <div className={style.num}>{`${user.exp} / ${user.expNextLevel}`}</div>
+                                </div>
+                                <div className={style.buttons}>
+                                    <div
+                                        className={`${style.button_inv} ${!showInv ? style.buttonInvSelected : ""}`}
+                                        onClick={showInventary}
+                                    />
+                                    <div
+                                        className={`${style.button_spell} ${showInv ? style.buttonInvSelected : ""}`}
+                                        onClick={showSpells}
+                                    />
+                                </div>
+                            </div>
+                            <div className={style.body}>
+                                <div
+                                    className={style.inventary}
+                                    style={{ display: showInv ? "block" : "none" }}
+                                >
+                                    {renderBoxItems()}
+                                </div>
+                                <div
+                                    className={style.spell}
+                                    style={{ display: showInv ? "none" : "block" }}
+                                >
+                                    {renderBoxSpells()}
+                                </div>
+                            </div>
+                            <div className={style.footer}>
+                                <div className={style.info_map}>
+                                    <div className={style.name_map}>{nameMap}</div>
+                                    <div className={style.pos_map}>
+                                        {user.pos
+                                            ? `Mapa: ${configRef.current ? configRef.current.mapNumber : ""} X: ${user.pos.x} Y: ${user.pos.y}`
+                                            : ""}
                                     </div>
-                                    <div className={style.exp}>
+                                </div>
+                                <div className={style.left_footer}>
+                                    <div className={style.hp}>
                                         <div
                                             className={style.progress_bar}
                                             style={{
-                                                width: `${(((user.exp * 100) /
-                                                    user.expNextLevel) *
-                                                    this.config.xpLength) /
-                                                    100}px`
+                                                width: `${(user.hp * (configRef.current ? configRef.current.hpLength : 0)) / user.maxHp}px`
                                             }}
                                         />
-                                        <div className={style.porcentaje}>{`${(
-                                            (user.exp * 100) /
-                                            user.expNextLevel
-                                        ).toFixed(2)}%`}</div>
-                                        <div className={style.num}>{`${
-                                            user.exp
-                                        } / ${user.expNextLevel}`}</div>
+                                        <div className={style.num}>{`${user.hp} / ${user.maxHp}`}</div>
                                     </div>
-                                    <div className={style.buttons}>
+                                    <div className={style.mana}>
                                         <div
-                                            className={`${style.button_inv} ${
-                                                !showInventary
-                                                    ? style.buttonInvSelected
-                                                    : ""
-                                            }`}
-                                            onClick={this.showInventary}
+                                            className={style.progress_bar}
+                                            style={{
+                                                width: `${(user.mana * (configRef.current ? configRef.current.manaLength : 0)) / user.maxMana}px`
+                                            }}
                                         />
-                                        <div
-                                            className={`${style.button_spell} ${
-                                                showInventary
-                                                    ? style.buttonInvSelected
-                                                    : ""
-                                            }`}
-                                            onClick={this.showSpells}
-                                        />
+                                        <div className={style.num}>{`${user.mana} / ${user.maxMana}`}</div>
+                                    </div>
+                                    <div className={style.gold}>{user.gold}</div>
+                                    <div className={style.attr}>
+                                        <div className={style.agilidad}>{user.attrAgilidad}</div>
+                                        <div className={style.fuerza}>{user.attrFuerza}</div>
                                     </div>
                                 </div>
-                                <div className={style.body}>
+                                <div className={style.right_footer}>
                                     <div
-                                        className={style.inventary}
+                                        className={style.minimap}
                                         style={{
-                                            display: showInventary
-                                                ? "block"
+                                            backgroundImage: configRef.current && configRef.current.mapNumber
+                                                ? `url('/static/imgs_mapas/${configRef.current.mapNumber}.png')`
                                                 : "none"
                                         }}
                                     >
-                                        {this.renderBoxItems()}
-                                    </div>
-                                    <div
-                                        className={style.spell}
-                                        style={{
-                                            display: showInventary
-                                                ? "none"
-                                                : "block"
-                                        }}
-                                    >
-                                        {this.renderBoxSpells()}
-                                    </div>
-                                </div>
-                                <div className={style.footer}>
-                                    <div className={style.info_map}>
-                                        <div className={style.name_map}>
-                                            {nameMap}
-                                        </div>
-                                        <div className={style.pos_map}>
-                                            {user.pos
-                                                ? `Mapa: ${
-                                                      this.config.mapNumber
-                                                  } X: ${user.pos.x} Y: ${
-                                                      user.pos.y
-                                                  }`
-                                                : ""}
-                                        </div>
-                                    </div>
-                                    <div className={style.left_footer}>
-                                        <div className={style.hp}>
-                                            <div
-                                                className={style.progress_bar}
-                                                style={{
-                                                    width: `${(user.hp *
-                                                        this.config.hpLength) /
-                                                        user.maxHp}px`
-                                                }}
-                                            />
-                                            <div className={style.num}>{`${
-                                                user.hp
-                                            } / ${user.maxHp}`}</div>
-                                        </div>
-                                        <div className={style.mana}>
-                                            <div
-                                                className={style.progress_bar}
-                                                style={{
-                                                    width: `${(user.mana *
-                                                        this.config
-                                                            .manaLength) /
-                                                        user.maxMana}px`
-                                                }}
-                                            />
-                                            <div className={style.num}>{`${
-                                                user.mana
-                                            } / ${user.maxMana}`}</div>
-                                        </div>
-                                        <div className={style.gold}>
-                                            {user.gold}
-                                        </div>
-                                        <div className={style.attr}>
-                                            <div className={style.agilidad}>
-                                                {user.attrAgilidad}
-                                            </div>
-                                            <div className={style.fuerza}>
-                                                {user.attrFuerza}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className={style.right_footer}>
                                         <div
-                                            className={style.minimap}
+                                            className={style.point_minimap}
                                             style={{
-                                                backgroundImage: this.config
-                                                    .mapNumber
-                                                    ? `url('/static/imgs_mapas/${
-                                                          this.config.mapNumber
-                                                      }.png')`
-                                                    : "none"
+                                                top: user.pos ? `${user.pos.y - 1}px` : 0,
+                                                left: user.pos ? `${user.pos.x - 1}px` : 0
                                             }}
-                                        >
-                                            <div
-                                                className={style.point_minimap}
-                                                style={{
-                                                    top: user.pos
-                                                        ? `${user.pos.y - 1}px`
-                                                        : 0,
-                                                    left: user.pos
-                                                        ? `${user.pos.x - 1}px`
-                                                        : 0
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div className={style.buttons_map}>
-                                            <div className={style.open_map} />
-                                        </div>
+                                        />
+                                    </div>
+                                    <div className={style.buttons_map}>
+                                        <div className={style.open_map} />
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </React.Fragment>
-        );
-    }
+            </div>
+        </React.Fragment>
+    );
 }
 
-export default Home;
+export default Play;

@@ -1,3 +1,7 @@
+import { Application, Container, Text, TextStyle } from "pixi.js";
+import { drawGrhPixi } from "./pixi/pixiRenderer";
+import { drawCharPixi, drawFxPixi } from "./pixi/drawCharPixi";
+
 class Engine {
     constructor(inits, user, pkg, config, game, refCanvas, react) {
         this.inits = inits;
@@ -32,8 +36,6 @@ class Engine {
         this.timeMoveDescClient = 0;
 
         this.timeWalk = 0;
-
-        this.canvas = {};
         this.refCanvas = refCanvas;
 
         this.keydown = {};
@@ -64,25 +66,23 @@ class Engine {
     }
 
     initCanvas = async () => {
-        this.canvas.background = {};
-        this.canvas.background.ctx = this.refCanvas.background.getContext(
-            "2d",
-            {
-                alpha: false
-            }
-        );
-
-        this.canvas.techos = {};
-        this.canvas.techos.ctx = this.refCanvas.techos.getContext("2d");
-
-        this.canvas.foreground = {};
-        this.canvas.foreground.ctx = this.refCanvas.foreground.getContext("2d");
-
-        this.canvas.items = {};
-        this.canvas.items.ctx = this.refCanvas.items.getContext("2d");
-
-        this.canvas.textos = {};
-        this.canvas.textos.ctx = this.refCanvas.textos.getContext("2d");
+        this.pixiApp = new Application();
+        await this.pixiApp.init({
+            width: this.config.canvasSize.width,
+            height: this.config.canvasSize.height,
+            canvas: this.refCanvas.pixi,
+            backgroundAlpha: 0,
+            preference: "webgl"
+        });
+        this.pixiLayers = {
+            background: new Container(),
+            items: new Container(),
+            foreground: new Container(),
+            techos: new Container(),
+            textos: new Container()
+        };
+        this.pixiApp.stage.addChild(...Object.values(this.pixiLayers));
+        this.pixiApp.ticker.stop();
 
         const loadMaps = this.inits.loadMaps();
         const loadObjs = this.inits.loadObjs();
@@ -384,12 +384,9 @@ class Engine {
     };
 
     clearRender = capa => {
-        this.canvas[capa].ctx.clearRect(
-            0,
-            0,
-            this.config.canvasSize.width,
-            this.config.canvasSize.height
-        );
+        if (this.pixiLayers?.[capa]) {
+            this.pixiLayers[capa].removeChildren();
+        }
     };
 
     showNextFrame = () => {
@@ -452,6 +449,10 @@ class Engine {
     render = () => {
         try {
             this.showNextFrame();
+
+            if (this.pixiApp) {
+                this.pixiApp.renderer.render(this.pixiApp.stage);
+            }
 
             this.fps();
             this.framesPerSecCounter = this.framesPerSecCounter + 1;
@@ -967,24 +968,8 @@ class Engine {
                 const image = this.inits.preCacheGraphics[grh.numFile];
 
                 if (image) {
-                    if (alpha) {
-                        this.canvas[capa].ctx.globalAlpha = 0.5;
-                    }
-                    if (this.canvas[capa].ctx) {
-                        this.canvas[capa].ctx.drawImage(
-                            image,
-                            grh.sX,
-                            grh.sY,
-                            grh.width,
-                            grh.height,
-                            x,
-                            y,
-                            grh.width,
-                            grh.height
-                        );
-                    }
-                    if (alpha) {
-                        this.canvas[capa].ctx.globalAlpha = 1;
+                    if (this.pixiLayers?.[capa]) {
+                        drawGrhPixi(this.pixiLayers[capa], grh, x, y, alpha);
                     }
                 } else {
                     if (grh.numFile) {
@@ -1182,171 +1167,14 @@ class Engine {
                         ];
                     }
 
-                    if (personaje.idHead) {
-                        const grhCabeza = this.inits.heads[personaje.idHead][
-                            personaje.heading
-                        ];
-
-                        const graphicGrhHead = this.inits.graphics[grhCabeza];
-
-                        const widtHead = graphicGrhHead.width;
-                        const heightHead = graphicGrhHead.height;
-
-                        if (
-                            this.inits.preCacheGraphics[graphicGrhHead.numFile]
-                        ) {
-                            this.canvas.foreground.ctx.drawImage(
-                                this.inits.preCacheGraphics[
-                                    graphicGrhHead.numFile
-                                ],
-                                graphicGrhHead.sX,
-                                graphicGrhHead.sY,
-                                widtHead,
-                                heightHead,
-                                sX + this.config.OffsetXHead,
-                                sY +
-                                    this.inits.bodies[personaje.idBody]
-                                        .headOffsetY -
-                                    18,
-                                widtHead,
-                                heightHead
-                            );
-                        } else {
-                            this.inits.loadImage(graphicGrhHead.numFile);
-                        }
-                    }
-
-                    if (graphicsGrhRopa) {
-                        const widthRopa = graphicsGrhRopa.width;
-                        const heightRopa = graphicsGrhRopa.height;
-
-                        const tmpsX =
-                            sX - Math.floor((widthRopa * 16) / 32) + 16;
-                        const tmpsY =
-                            sY - Math.floor((heightRopa * 32) / 32) + 32;
-
-                        if (
-                            this.inits.preCacheGraphics[graphicsGrhRopa.numFile]
-                        ) {
-                            this.canvas.foreground.ctx.drawImage(
-                                this.inits.preCacheGraphics[
-                                    graphicsGrhRopa.numFile
-                                ],
-                                graphicsGrhRopa.sX,
-                                graphicsGrhRopa.sY,
-                                widthRopa,
-                                heightRopa,
-                                tmpsX,
-                                tmpsY,
-                                widthRopa,
-                                heightRopa
-                            );
-                        } else {
-                            this.inits.loadImage(graphicsGrhRopa.numFile);
-                        }
-                    }
-
-                    if (personaje.idHelmet) {
-                        const casco = this.inits.cascos[personaje.idHelmet];
-                        const grhHelmet = this.inits.cascos[personaje.idHelmet][
-                            personaje.heading
-                        ];
-
-                        const graphicGrhHelmet = this.inits.graphics[grhHelmet];
-
-                        const widtHelmet = graphicGrhHelmet.width;
-                        const heightHelmet = graphicGrhHelmet.height;
-
-                        if (
-                            this.inits.preCacheGraphics[
-                                graphicGrhHelmet.numFile
-                            ]
-                        ) {
-                            this.canvas.foreground.ctx.drawImage(
-                                this.inits.preCacheGraphics[
-                                    graphicGrhHelmet.numFile
-                                ],
-                                graphicGrhHelmet.sX,
-                                graphicGrhHelmet.sY,
-                                widtHelmet,
-                                heightHelmet,
-                                sX + this.config.OffsetXHead + casco.offsetX,
-                                sY +
-                                    this.inits.bodies[personaje.idBody]
-                                        .headOffsetY -
-                                    18 +
-                                    casco.offsetY,
-                                widtHelmet,
-                                heightHelmet
-                            );
-                        } else {
-                            this.inits.loadImage(graphicGrhHelmet.numFile);
-                        }
-                    }
-
-                    if (graphicsGrhWeapon) {
-                        const widthWeapon = graphicsGrhWeapon.width;
-                        const heightWeapon = graphicsGrhWeapon.height;
-
-                        const tmpsX =
-                            sX - Math.floor((widthWeapon * 16) / 32) + 16;
-                        const tmpsY =
-                            sY - Math.floor((heightWeapon * 32) / 32) + 28;
-
-                        if (
-                            this.inits.preCacheGraphics[
-                                graphicsGrhWeapon.numFile
-                            ]
-                        ) {
-                            this.canvas.foreground.ctx.drawImage(
-                                this.inits.preCacheGraphics[
-                                    graphicsGrhWeapon.numFile
-                                ],
-                                graphicsGrhWeapon.sX,
-                                graphicsGrhWeapon.sY,
-                                widthWeapon,
-                                heightWeapon,
-                                tmpsX,
-                                tmpsY,
-                                widthWeapon,
-                                heightWeapon
-                            );
-                        } else {
-                            this.inits.loadImage(graphicsGrhWeapon.numFile);
-                        }
-                    }
-
-                    if (graphicsGrhShield) {
-                        const widthShield = graphicsGrhShield.width;
-                        const heightShield = graphicsGrhShield.height;
-
-                        const tmpsX =
-                            sX - Math.floor((widthShield * 16) / 32) + 16;
-                        const tmpsY =
-                            sY - Math.floor((heightShield * 32) / 32) + 32;
-
-                        if (
-                            this.inits.preCacheGraphics[
-                                graphicsGrhShield.numFile
-                            ]
-                        ) {
-                            this.canvas.foreground.ctx.drawImage(
-                                this.inits.preCacheGraphics[
-                                    graphicsGrhShield.numFile
-                                ],
-                                graphicsGrhShield.sX,
-                                graphicsGrhShield.sY,
-                                widthShield,
-                                heightShield,
-                                tmpsX,
-                                tmpsY,
-                                widthShield,
-                                heightShield
-                            );
-                        } else {
-                            this.inits.loadImage(graphicsGrhShield.numFile);
-                        }
-                    }
+                    drawCharPixi(
+                        this.pixiLayers.foreground,
+                        personaje,
+                        this.inits,
+                        this.config,
+                        sX,
+                        sY
+                    );
 
                     const nameX = sX - nameLength + 16;
 
@@ -1454,33 +1282,14 @@ class Engine {
                     sX += this.inits.fxs[personaje.fxId].offsetX;
                     sY += this.inits.fxs[personaje.fxId].offsetY;
 
-                    if (alpha) {
-                        this.canvas.foreground.ctx.globalAlpha = 0.6;
-                    }
-
-                    if (
-                        this.inits.preCacheGraphics[graphicCurrentGrh.numFile]
-                    ) {
-                        this.canvas.foreground.ctx.drawImage(
-                            this.inits.preCacheGraphics[
-                                graphicCurrentGrh.numFile
-                            ],
-                            graphicCurrentGrh.sX,
-                            graphicCurrentGrh.sY,
-                            width,
-                            height,
-                            sX,
-                            sY,
-                            width,
-                            height
-                        );
-                    } else {
-                        this.inits.loadImage(graphicCurrentGrh.numFile);
-                    }
-
-                    if (alpha) {
-                        this.canvas.foreground.ctx.globalAlpha = 1;
-                    }
+                    drawFxPixi(
+                        this.pixiLayers.foreground,
+                        graphicCurrentGrh,
+                        sX,
+                        sY,
+                        alpha,
+                        this.inits
+                    );
                 }
             }
         } catch (err) {
@@ -1490,26 +1299,6 @@ class Engine {
 
     renderDialog = (id, x, y, color, bold, fontSize, fontType) => {
         try {
-            let options = "";
-
-            if (bold) {
-                options += "bold";
-            }
-
-            if (fontSize) {
-                options += " " + fontSize + "px";
-            }
-
-            if (fontType) {
-                options += " " + fontType;
-            }
-
-            this.canvas.textos.ctx.font = options;
-
-            if (color) {
-                this.canvas.textos.ctx.fillStyle = color;
-            }
-
             const text = this.config.dialogs[id].msg;
             const words = text.split(" ");
             let wordsLine = "";
@@ -1539,17 +1328,14 @@ class Engine {
                     i == wordsLength - 1
                 ) {
                     const textPosY = y + lineHeight * currentLine++ - posYText;
-
-                    this.canvas.textos.ctx.strokeStyle = "#000000";
-                    this.canvas.textos.ctx.strokeText(
-                        wordsLine,
+                    this.renderPixiText(
+                        wordsLine.trim(),
                         x - 20,
-                        textPosY
-                    );
-                    this.canvas.textos.ctx.fillText(
-                        wordsLine,
-                        x - 20,
-                        textPosY
+                        textPosY,
+                        color,
+                        bold,
+                        fontSize,
+                        fontType
                     );
                     wordsLine = "";
                     count = 0;
@@ -1571,29 +1357,7 @@ class Engine {
 
     renderText = (text, x, y, color, bold, fontSize, fontType) => {
         try {
-            let options = "";
-
-            if (bold) {
-                options += "bold";
-            }
-
-            if (fontSize) {
-                options += " " + fontSize + "px";
-            }
-
-            if (fontType) {
-                options += " " + fontType;
-            }
-
-            this.canvas.textos.ctx.font = options;
-
-            if (color) {
-                this.canvas.textos.ctx.fillStyle = color;
-            }
-
-            this.canvas.textos.ctx.strokeStyle = "#000000";
-            this.canvas.textos.ctx.strokeText(text, x, y);
-            this.canvas.textos.ctx.fillText(text, x, y);
+            this.renderPixiText(text, x, y, color, bold, fontSize, fontType);
         } catch (err) {
             dumpError(err);
         }
@@ -1601,32 +1365,38 @@ class Engine {
 
     renderText2 = (text, x, y, color, bold, fontSize, fontType) => {
         try {
-            let options = "";
-
-            if (bold) {
-                options += "bold";
-            }
-
-            if (fontSize) {
-                options += " " + fontSize + "px";
-            }
-
-            if (fontType) {
-                options += " " + fontType;
-            }
-
-            this.canvas.foreground.ctx.font = options;
-
-            if (color) {
-                this.canvas.foreground.ctx.fillStyle = color;
-            }
-
-            this.canvas.foreground.ctx.strokeStyle = "#000000";
-            this.canvas.foreground.ctx.strokeText(text, x, y);
-            this.canvas.foreground.ctx.fillText(text, x, y);
+            this.renderPixiText(text, x, y, color, bold, fontSize, fontType);
         } catch (err) {
             dumpError(err);
         }
+    };
+
+    renderPixiText = (text, x, y, color, bold, fontSize, fontType) => {
+        if (!this.pixiLayers?.textos || !text) {
+            return;
+        }
+
+        const style = new TextStyle({
+            fill: color || "#ffffff",
+            fontFamily: fontType || "Tahoma",
+            fontSize: fontSize || 12,
+            fontWeight: bold ? "bold" : "normal",
+            stroke: {
+                color: "#000000",
+                width: 3,
+                join: "round"
+            }
+        });
+
+        const pixiText = new Text({
+            text,
+            style
+        });
+
+        pixiText.x = x;
+        pixiText.y = y - pixiText.height;
+
+        this.pixiLayers.textos.addChild(pixiText);
     };
 
     moveTo = (userId, direccion) => {

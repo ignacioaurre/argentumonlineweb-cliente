@@ -69,12 +69,11 @@ self.timeRangeStart = 0;
 self.usersOnline = 0;
 
 //Conections
-self.debug = true;
+// NEXT_PUBLIC_WS_URL es inyectado por Next.js en build time desde .env
+// Cambiar a wss:// en producción cuando el servidor tenga TLS activo
+self.WS_ENDPOINT = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:7666";
 
 self.descClient = {};
-
-self.PROD_SERVER_ENDPOINT = "";
-self.LOCAL_SERVER_ENDPOINT = "ws://127.0.0.1:7666";
 
 self.hechizoSelected = 0;
 self.itemSelected = 0;

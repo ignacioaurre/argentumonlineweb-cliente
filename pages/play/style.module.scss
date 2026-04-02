@@ -594,32 +594,8 @@
                     margin-left: 16px;
                     background-color: #000;
                     position: relative;
-                    .background {
+                    .pixi {
                         z-index: 0;
-                        position: absolute;
-                    }
-                    .foreground {
-                        z-index: 2;
-                        position: absolute;
-                    }
-                    .items {
-                        z-index: 1;
-                        position: absolute;
-                    }
-                    .characters {
-                        z-index: 3;
-                        position: absolute;
-                    }
-                    .techos {
-                        z-index: 4;
-                        position: absolute;
-                    }
-                    .textos {
-                        z-index: 5;
-                        position: absolute;
-                    }
-                    .mouseEvent {
-                        z-index: 7;
                         position: absolute;
                     }
                 }

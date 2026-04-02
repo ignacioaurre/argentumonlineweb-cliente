@@ -15,11 +15,7 @@ class Connection {
     }
 
     startWebSocket() {
-        if (this.config.debug) {
-            this.config.ws = new WebSocket(this.config.LOCAL_SERVER_ENDPOINT);
-        } else {
-            this.config.ws = new WebSocket(this.config.PROD_SERVER_ENDPOINT);
-        }
+        this.config.ws = new WebSocket(this.config.WS_ENDPOINT);
 
         this.config.ws.binaryType = "arraybuffer";
 
